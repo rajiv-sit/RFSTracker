@@ -34,8 +34,8 @@ RFSTracker is a Windows-based multi-target tracking prototype that simulates a 5
 - The control panel exposes NEES, RMSE, and OSPA alongside sparkline plots (256-sample history).
 - Visualizer colors:
   * Truth: green
-  * Measurements: blue
-  * Track statuses - newborn (yellow), tentative (pink), confirmed (red)
+  * Measurements: red
+  * Track statuses - confirmed (blue)
 
 <figure>
   <img width="1917" height="1025" alt="image" src="https://github.com/user-attachments/assets/e374debb-c11e-46c8-9546-4bec98f85b4e" />
