@@ -16,17 +16,26 @@ int main(int argc, char **argv) {
   logMessage("main: start");
   auto config = std::make_shared<rfs::TrackerConfig>(rfs::TrackerConfig::defaultConfig());
 
-  const std::string configPath =
-      (argc > 1) ? std::string(argv[1]) : "config/default_tracker_config.json";
+  const std::filesystem::path inputPath =
+      (argc > 1) ? std::filesystem::path(argv[1])
+                 : std::filesystem::path("config/default_tracker_config.json");
+  std::filesystem::path resolvedPath = inputPath;
+  if (!resolvedPath.is_absolute() && !std::filesystem::exists(resolvedPath)) {
+    const auto exeDir = std::filesystem::path(argv[0]).parent_path();
+    const auto candidate = exeDir / inputPath;
+    if (std::filesystem::exists(candidate)) {
+      resolvedPath = candidate;
+    }
+  }
 
-  if (std::filesystem::exists(configPath)) {
-    if (!config->loadFromJson(configPath)) {
-      std::cerr << "WARN: Failed to parse " << configPath << ", using defaults.\n";
+  if (std::filesystem::exists(resolvedPath)) {
+    if (!config->loadFromJson(resolvedPath.string())) {
+      std::cerr << "WARN: Failed to parse " << resolvedPath << ", using defaults.\n";
       logMessage("main: failed to parse config");
     }
   } else {
-    std::cerr << "INFO: Config file " << configPath << " not found; using defaults.\n";
-    logMessage("main: config file not found");
+    std::cerr << "INFO: Config file " << resolvedPath << " not found; using defaults.\n";
+    logMessage("main: config file not found " + resolvedPath.string());
   }
 
   if (!config->validate()) {

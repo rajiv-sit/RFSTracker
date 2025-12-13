@@ -247,8 +247,31 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
   showMetricsWindow(measurements, tracks, truth, metrics);
 
   int displayW, displayH;
+  std::vector<Eigen::Vector2d> confirmedTrackPoints;
+  std::vector<const TrackState *> confirmedTrackPtrs;
+  if (options_.showTracks) {
+    for (const auto &track : tracks) {
+      if (track.status == TrackStatus::Confirmed) {
+        confirmedTrackPoints.push_back(track.position);
+        confirmedTrackPtrs.push_back(&track);
+      }
+    }
+  }
+
   glfwGetFramebufferSize(window_, &displayW, &displayH);
   renderAxisLabels(displayW, displayH);
+  if (options_.showTracks && !confirmedTrackPtrs.empty()) {
+    auto *drawList = ImGui::GetForegroundDrawList();
+    const ImU32 idColor = colorForStatus(TrackStatus::Confirmed);
+    constexpr float labelOffset = 8.0f;
+    for (const auto *track : confirmedTrackPtrs) {
+      const ImVec2 screenPos = worldToScreen(track->position, displayW, displayH);
+      const ImVec2 labelPos(screenPos.x + labelOffset, screenPos.y - labelOffset);
+      const std::string label = std::to_string(track->id);
+      drawList->AddText(labelPos, idColor, label.c_str());
+    }
+  }
+
   ImGui::Render();
   glViewport(0, 0, displayW, displayH);
   glClearColor(0.06f, 0.06f, 0.07f, 1.0f);
@@ -274,26 +297,7 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
   }
 
   if (options_.showTracks) {
-    std::vector<Eigen::Vector2d> confirmedPoints;
-    for (const auto &track : tracks) {
-      if (track.status == TrackStatus::Confirmed) {
-        confirmedPoints.push_back(track.position);
-      }
-    }
-    renderPoints(confirmedPoints, {0.18, 0.60, 1.0}, 8.0f);
-
-    auto *drawList = ImGui::GetForegroundDrawList();
-    const ImU32 idColor = colorForStatus(TrackStatus::Confirmed);
-    constexpr float labelOffset = 8.0f;
-    for (const auto &track : tracks) {
-      if (track.status != TrackStatus::Confirmed) {
-        continue;
-      }
-      const ImVec2 screenPos = worldToScreen(track.position, displayW, displayH);
-      const ImVec2 labelPos(screenPos.x + labelOffset, screenPos.y - labelOffset);
-      const std::string label = std::to_string(track.id);
-      drawList->AddText(labelPos, idColor, label.c_str());
-    }
+    renderPoints(confirmedTrackPoints, {0.18, 0.60, 1.0}, 8.0f);
   }
 
   updateTrails(tracks, truth);
