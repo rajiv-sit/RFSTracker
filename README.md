@@ -38,7 +38,7 @@ RFSTracker is a Windows-based multi-target tracking prototype that simulates a 5
   * Track statuses - newborn (yellow), tentative (pink), confirmed (red)
 
 <figure>
-  <img src="docs/figures/visualizer.png" alt="Visualizer UI placeholder" />
+  <img width="1917" height="1025" alt="image" src="https://github.com/user-attachments/assets/e374debb-c11e-46c8-9546-4bec98f85b4e" />
   <figcaption><strong>Figure 1.</strong> ImGui visualizer showing measurement dots, truth targets, confirmed-track labels, and the control/metrics panels.</figcaption>
 </figure>
 
