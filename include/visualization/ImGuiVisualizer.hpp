@@ -65,6 +65,7 @@ private:
                          const std::vector<TrackState> &tracks,
                          const std::vector<TargetState_t> &truth,
                          const PerformanceMetrics &metrics);
+  ImVec2 worldToScreen(const Eigen::Vector2d &position, int displayW, int displayH) const;
   void renderAxisLabels(int displayW, int displayH) const;
 
   std::shared_ptr<TrackerConfig> config_;

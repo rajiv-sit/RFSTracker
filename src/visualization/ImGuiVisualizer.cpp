@@ -281,12 +281,23 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
       }
     }
     renderPoints(confirmedPoints, {0.18, 0.60, 1.0}, 8.0f);
+
+    auto *drawList = ImGui::GetForegroundDrawList();
+    const ImU32 idColor = colorForStatus(TrackStatus::Confirmed);
+    constexpr float labelOffset = 8.0f;
+    for (const auto &track : tracks) {
+      if (track.status != TrackStatus::Confirmed) {
+        continue;
+      }
+      const ImVec2 screenPos = worldToScreen(track.position, displayW, displayH);
+      const ImVec2 labelPos(screenPos.x + labelOffset, screenPos.y - labelOffset);
+      const std::string label = std::to_string(track.id);
+      drawList->AddText(labelPos, idColor, label.c_str());
+    }
   }
 
   updateTrails(tracks, truth);
-  if (options_.showTracks) {
-    renderTrackTrails();
-  }
+  // renderTrackTrails();  // temporarily disabled while ID labels are active
   if (options_.showTruth) {
     renderTrajectories(truthTrails_, {0.18, 0.85, 0.33}, 2.2f);
   }
@@ -410,6 +421,18 @@ void ImGuiVisualizer::renderAxisLabels(int displayW, int displayH) const {
   ImGui::Begin("##AxisYLabels", nullptr, windowFlags);
   ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 0.9f), "Y (m)");
   ImGui::End();
+}
+
+ImVec2 ImGuiVisualizer::worldToScreen(const Eigen::Vector2d &position,
+                                      int displayW,
+                                      int displayH) const {
+  const float normalizedX =
+      (static_cast<float>(position.x()) + areaHalfWidth_) / (2.0f * areaHalfWidth_);
+  const float normalizedY =
+      (static_cast<float>(position.y()) + areaHalfHeight_) / (2.0f * areaHalfHeight_);
+  const float screenX = normalizedX * static_cast<float>(displayW);
+  const float screenY = (1.0f - normalizedY) * static_cast<float>(displayH);
+  return ImVec2(screenX, screenY);
 }
 
 Eigen::Vector3d ImGuiVisualizer::colorVectorForStatus(TrackStatus status) const {
