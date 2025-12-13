@@ -49,6 +49,11 @@ target_link_libraries(rfs_app PRIVATE rfs_core
     glfw
 )
 
+add_custom_command(TARGET rfs_app POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_SOURCE_DIR}/config
+            $<TARGET_FILE_DIR:rfs_app>/config)
+
 add_executable(rfs_config_test tests/unit/test_tracker_config.cpp)
 target_link_libraries(rfs_config_test PRIVATE rfs_core)
 

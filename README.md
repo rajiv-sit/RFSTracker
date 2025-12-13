@@ -25,6 +25,7 @@ RFSTracker is a Windows-based multi-target tracking prototype that simulates a 5
    * Configure & build the Debug CMake configuration.
    * Launch `build_debug\Debug\rfs_app.exe` automatically. Close the GUI window once you’ve reviewed the visuals to return to the shell.
 3. `rfs_app.exe` uses `config/default_tracker_config.json` by default; if the file is missing, defaults are logged (you can pass a custom path on the command line).
+   * CMake now copies the `config/` folder into each build output directory, so the executable always finds the JSONs (no manual copying required).
 
 ## Running the App
 
