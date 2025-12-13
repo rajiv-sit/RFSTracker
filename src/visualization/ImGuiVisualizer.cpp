@@ -274,24 +274,12 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
   }
 
   if (options_.showTracks) {
-    std::vector<Eigen::Vector2d> newbornPoints;
-    std::vector<Eigen::Vector2d> tentativePoints;
     std::vector<Eigen::Vector2d> confirmedPoints;
     for (const auto &track : tracks) {
-      switch (track.status) {
-      case TrackStatus::Newborn:
-        newbornPoints.push_back(track.position);
-        break;
-      case TrackStatus::Tentative:
-        tentativePoints.push_back(track.position);
-        break;
-      default:
+      if (track.status == TrackStatus::Confirmed) {
         confirmedPoints.push_back(track.position);
-        break;
       }
     }
-    renderPoints(newbornPoints, {1.0, 0.9, 0.5}, 8.0f);
-    renderPoints(tentativePoints, {1.0, 0.5, 0.7}, 8.0f);
     renderPoints(confirmedPoints, {0.18, 0.60, 1.0}, 8.0f);
   }
 
