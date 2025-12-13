@@ -11,6 +11,9 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <unordered_map>
+#include <unordered_set>
+#include <deque>
 #include <vector>
 #include <Eigen/Dense>
 
@@ -240,15 +243,16 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
 
-  showControlPanels(measurements, tracks, truth, metrics, scanId, timeElapsed);
+  showControlPanels(measurements, tracks, scanId, timeElapsed);
+  showMetricsWindow(measurements, tracks, truth, metrics);
 
-  ImGui::Render();
   int displayW, displayH;
   glfwGetFramebufferSize(window_, &displayW, &displayH);
+  renderAxisLabels(displayW, displayH);
+  ImGui::Render();
   glViewport(0, 0, displayW, displayH);
   glClearColor(0.06f, 0.06f, 0.07f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT);
-
   renderGrid();
 
   if (options_.showMeasurements) {
@@ -257,7 +261,7 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
     for (const auto &measurement : measurements.measurements) {
       measurementPoints.push_back(measurement.value);
     }
-    renderPoints(measurementPoints, {0.29, 0.56, 0.89}, 6.0f);
+    renderPoints(measurementPoints, {1.0, 0.18, 0.18}, 6.0f);
   }
 
   if (options_.showTruth) {
@@ -266,7 +270,7 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
     for (const auto &truthTarget : truth) {
       truthPoints.emplace_back(truthTarget.state.head<2>());
     }
-    renderPoints(truthPoints, {0.38, 1.0, 0.51}, 7.0f);
+    renderPoints(truthPoints, {0.18, 0.85, 0.33}, 7.0f);
   }
 
   if (options_.showTracks) {
@@ -288,8 +292,12 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
     }
     renderPoints(newbornPoints, {1.0, 0.9, 0.5}, 8.0f);
     renderPoints(tentativePoints, {1.0, 0.5, 0.7}, 8.0f);
-    renderPoints(confirmedPoints, {1.0, 0.39, 0.28}, 8.0f);
+    renderPoints(confirmedPoints, {0.18, 0.60, 1.0}, 8.0f);
   }
+
+  updateTrails(tracks, truth);
+  renderTrackTrails();
+  renderTrajectories(truthTrails_, {0.18, 0.85, 0.33}, 2.2f);
 
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
   glfwSwapBuffers(window_);
@@ -297,16 +305,13 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
 
 void ImGuiVisualizer::showControlPanels(const MeasurementSet_t &measurements,
                                         const std::vector<TrackState> &tracks,
-                                        const std::vector<TargetState_t> &truth,
-                                        const PerformanceMetrics &metrics,
                                         int scanId,
                                         double timeElapsed) {
   ImGui::Begin("Tracker Controls");
   ImGui::Text("Scan #%d \u2013 Time %.2fs", scanId, timeElapsed);
   ImGui::Separator();
-  ImGui::Text("Truth targets: %zu", truth.size());
-  ImGui::Text("Measurements: %zu", measurements.measurements.size());
-  ImGui::Text("Tracks: %zu", tracks.size());
+  ImGui::Text("Truth targets: %zu", measurements.measurements.size());
+  ImGui::Text("Tracks alive: %zu", tracks.size());
   ImGui::Spacing();
   ImGui::Text("Display");
   ImGui::Checkbox("Show Truth", &options_.showTruth);
@@ -315,8 +320,18 @@ void ImGuiVisualizer::showControlPanels(const MeasurementSet_t &measurements,
   if (ImGui::Button(options_.showTrackDetails ? "Hide Track Details" : "Show Track Details")) {
     options_.showTrackDetails = !options_.showTrackDetails;
   }
-  ImGui::Spacing();
-  ImGui::Text("Performance Metrics");
+  ImGui::End();
+}
+
+void ImGuiVisualizer::showMetricsWindow(const MeasurementSet_t &measurements,
+                                        const std::vector<TrackState> &tracks,
+                                        const std::vector<TargetState_t> &truth,
+                                        const PerformanceMetrics &metrics) {
+  ImGui::Begin("Performance Metrics & Track Details");
+  ImGui::Text("Measurements: %zu", measurements.measurements.size());
+  ImGui::Text("Truth targets: %zu", truth.size());
+  ImGui::Text("Tracks: %zu", tracks.size());
+  ImGui::Separator();
   ImGui::Text("RMSE: %.2f", metrics.rmse);
   ImGui::Text("NEES: %.2f", metrics.nees);
   ImGui::Text("OSPA: %.2f", metrics.ospa);
@@ -332,11 +347,9 @@ void ImGuiVisualizer::showControlPanels(const MeasurementSet_t &measurements,
     ImGui::PlotLines("OSPA", ospaHistory_.data(), static_cast<int>(ospaHistory_.size()), 0,
                      nullptr, FLT_MAX, FLT_MAX, ImVec2(0, 60));
   }
-
-  ImGui::End();
-
+  ImGui::Spacing();
   if (options_.showTrackDetails) {
-    ImGui::Begin("Track Details", &options_.showTrackDetails);
+    ImGui::Text("Track Details");
     ImGui::Columns(7, nullptr, false);
     ImGui::Text("ID"); ImGui::NextColumn();
     ImGui::Text("Status"); ImGui::NextColumn();
@@ -364,9 +377,9 @@ void ImGuiVisualizer::showControlPanels(const MeasurementSet_t &measurements,
       ImGui::NextColumn();
     }
 
-  ImGui::Columns(1);
-    ImGui::End();
+    ImGui::Columns(1);
   }
+  ImGui::End();
 }
 
 void ImGuiVisualizer::renderGrid() const {
@@ -386,6 +399,42 @@ void ImGuiVisualizer::renderGrid() const {
   glDrawArrays(GL_LINES, 0, gridVertexCount_);
   glBindVertexArray(0);
   glUseProgram(0);
+}
+
+void ImGuiVisualizer::renderAxisLabels(int displayW, int displayH) const {
+  ImGuiWindowFlags windowFlags =
+      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs |
+      ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_AlwaysAutoResize |
+      ImGuiWindowFlags_NoBringToFrontOnFocus;
+
+  ImGui::SetNextWindowPos(ImVec2(10.0f, static_cast<float>(displayH) - 28.0f), ImGuiCond_Always);
+  ImGui::Begin("##AxisXLabels", nullptr, windowFlags);
+  ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 0.9f), "X (m)");
+  ImGui::End();
+
+  ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f), ImGuiCond_Always);
+  ImGui::Begin("##AxisYLabels", nullptr, windowFlags);
+  ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 0.9f), "Y (m)");
+  ImGui::End();
+}
+
+Eigen::Vector3d ImGuiVisualizer::colorVectorForStatus(TrackStatus status) const {
+  switch (status) {
+  case TrackStatus::Newborn:
+    return {1.0, 0.9, 0.5};
+  case TrackStatus::Tentative:
+    return {1.0, 0.5, 0.7};
+  default:
+    return {0.18, 0.6, 1.0};
+  }
+}
+
+ImU32 ImGuiVisualizer::colorForStatus(TrackStatus status) const {
+  const auto color = colorVectorForStatus(status);
+  return IM_COL32(static_cast<int>(color.x() * 255.0f),
+                  static_cast<int>(color.y() * 255.0f),
+                  static_cast<int>(color.z() * 255.0f),
+                  255);
 }
 
 void ImGuiVisualizer::renderPoints(const std::vector<Eigen::Vector2d> &points,
@@ -415,6 +464,100 @@ void ImGuiVisualizer::renderPoints(const std::vector<Eigen::Vector2d> &points,
   glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(points.size()));
   glBindVertexArray(0);
   glPointSize(1.0f);
+}
+
+void ImGuiVisualizer::renderTrajectory(const std::vector<Eigen::Vector2d> &points,
+                                       const Eigen::Vector3d &color,
+                                       float thickness) const {
+  if (points.size() < 2 || !pointVAO_ || !pointVBO_) {
+    return;
+  }
+
+  const auto mvp = orthographic(-areaHalfWidth_, areaHalfWidth_, -areaHalfHeight_, areaHalfHeight_, -1.0f, 1.0f);
+  glUseProgram(gridProgram_);
+  glUniformMatrix4fv(mvpLocation_, 1, GL_FALSE, mvp.data());
+  glUniform3f(colorLocation_, static_cast<float>(color.x()), static_cast<float>(color.y()),
+              static_cast<float>(color.z()));
+  glBindVertexArray(pointVAO_);
+  glBindBuffer(GL_ARRAY_BUFFER, pointVBO_);
+
+  std::vector<float> buffer;
+  buffer.reserve(points.size() * 2);
+  for (const auto &point : points) {
+    buffer.push_back(static_cast<float>(point.x()));
+    buffer.push_back(static_cast<float>(point.y()));
+  }
+  glBufferData(GL_ARRAY_BUFFER, buffer.size() * sizeof(float), buffer.data(), GL_STREAM_DRAW);
+
+  glLineWidth(thickness);
+  glDrawArrays(GL_LINE_STRIP, 0, static_cast<GLsizei>(points.size()));
+  glBindVertexArray(0);
+  glLineWidth(1.0f);
+}
+
+void ImGuiVisualizer::updateTrails(const std::vector<TrackState> &tracks,
+                                   const std::vector<TargetState_t> &truth) {
+  std::unordered_set<int> activeTrackIds;
+  for (const auto &track : tracks) {
+    auto &trail = trackTrails_[track.id];
+    trail.emplace_back(track.position);
+    if (trail.size() > kTrailLength) {
+      trail.pop_front();
+    }
+    trackStatus_[track.id] = track.status;
+    activeTrackIds.insert(track.id);
+  }
+  for (auto it = trackTrails_.begin(); it != trackTrails_.end();) {
+    if (activeTrackIds.find(it->first) == activeTrackIds.end()) {
+      trackStatus_.erase(it->first);
+      it = trackTrails_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  std::unordered_set<int> activeTruthIds;
+  for (const auto &target : truth) {
+    auto &trail = truthTrails_[target.id];
+    trail.emplace_back(target.state.head<2>());
+    if (trail.size() > kTrailLength) {
+      trail.pop_front();
+    }
+    activeTruthIds.insert(target.id);
+  }
+  for (auto it = truthTrails_.begin(); it != truthTrails_.end();) {
+    if (activeTruthIds.find(it->first) == activeTruthIds.end()) {
+      it = truthTrails_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
+void ImGuiVisualizer::renderTrackTrails() const {
+  for (const auto &entry : trackTrails_) {
+    if (entry.second.size() < 2) {
+      continue;
+    }
+    auto statusIt = trackStatus_.find(entry.first);
+    const auto color = statusIt != trackStatus_.end()
+                           ? colorVectorForStatus(statusIt->second)
+                           : Eigen::Vector3d{0.18, 0.6, 1.0};
+    std::vector<Eigen::Vector2d> points(entry.second.begin(), entry.second.end());
+    renderTrajectory(points, color, 2.4f);
+  }
+}
+
+void ImGuiVisualizer::renderTrajectories(const std::unordered_map<int, std::deque<Eigen::Vector2d>> &trails,
+                                         const Eigen::Vector3d &color,
+                                         float thickness) const {
+  for (const auto &entry : trails) {
+    if (entry.second.size() < 2) {
+      continue;
+    }
+    std::vector<Eigen::Vector2d> points(entry.second.begin(), entry.second.end());
+    renderTrajectory(points, color, thickness);
+  }
 }
 
 void ImGuiVisualizer::shutdown() {
