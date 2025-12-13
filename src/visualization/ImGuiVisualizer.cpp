@@ -261,7 +261,7 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
     for (const auto &measurement : measurements.measurements) {
       measurementPoints.push_back(measurement.value);
     }
-    renderPoints(measurementPoints, {1.0, 0.18, 0.18}, 6.0f);
+    renderPoints(measurementPoints, {1.0, 0.35, 0.35}, 6.0f);
   }
 
   if (options_.showTruth) {
