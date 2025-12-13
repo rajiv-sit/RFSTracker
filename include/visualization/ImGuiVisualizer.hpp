@@ -92,7 +92,6 @@ private:
   static constexpr size_t kTrailLength = 512;
   std::unordered_map<int, std::deque<Eigen::Vector2d>> trackTrails_;
   std::unordered_map<int, std::deque<Eigen::Vector2d>> truthTrails_;
-  std::unordered_map<int, TrackStatus> trackStatus_;
 };
 
 } // namespace rfs

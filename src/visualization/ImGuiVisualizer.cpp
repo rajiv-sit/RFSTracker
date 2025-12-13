@@ -505,17 +505,18 @@ void ImGuiVisualizer::updateTrails(const std::vector<TrackState> &tracks,
                                    const std::vector<TargetState_t> &truth) {
   std::unordered_set<int> activeTrackIds;
   for (const auto &track : tracks) {
+    if (track.status != TrackStatus::Confirmed) {
+      continue;
+    }
     auto &trail = trackTrails_[track.id];
     trail.emplace_back(track.position);
     if (trail.size() > kTrailLength) {
       trail.pop_front();
     }
-    trackStatus_[track.id] = track.status;
     activeTrackIds.insert(track.id);
   }
   for (auto it = trackTrails_.begin(); it != trackTrails_.end();) {
     if (activeTrackIds.find(it->first) == activeTrackIds.end()) {
-      trackStatus_.erase(it->first);
       it = trackTrails_.erase(it);
     } else {
       ++it;
@@ -545,10 +546,7 @@ void ImGuiVisualizer::renderTrackTrails() const {
     if (entry.second.size() < 2) {
       continue;
     }
-    auto statusIt = trackStatus_.find(entry.first);
-    const auto color = statusIt != trackStatus_.end()
-                           ? colorVectorForStatus(statusIt->second)
-                           : Eigen::Vector3d{0.18, 0.6, 1.0};
+    const auto color = colorVectorForStatus(TrackStatus::Confirmed);
     std::vector<Eigen::Vector2d> points(entry.second.begin(), entry.second.end());
     renderTrajectory(points, color, 2.4f);
   }
