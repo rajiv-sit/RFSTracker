@@ -243,7 +243,7 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
 
-  showControlPanels(measurements, tracks, scanId, timeElapsed);
+  showControlPanels(measurements, tracks, truth, scanId, timeElapsed);
   showMetricsWindow(measurements, tracks, truth, metrics);
 
   int displayW, displayH;
@@ -296,8 +296,12 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
   }
 
   updateTrails(tracks, truth);
-  renderTrackTrails();
-  renderTrajectories(truthTrails_, {0.18, 0.85, 0.33}, 2.2f);
+  if (options_.showTracks) {
+    renderTrackTrails();
+  }
+  if (options_.showTruth) {
+    renderTrajectories(truthTrails_, {0.18, 0.85, 0.33}, 2.2f);
+  }
 
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
   glfwSwapBuffers(window_);
@@ -305,12 +309,14 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
 
 void ImGuiVisualizer::showControlPanels(const MeasurementSet_t &measurements,
                                         const std::vector<TrackState> &tracks,
+                                        const std::vector<TargetState_t> &truth,
                                         int scanId,
                                         double timeElapsed) {
   ImGui::Begin("Tracker Controls");
   ImGui::Text("Scan #%d \u2013 Time %.2fs", scanId, timeElapsed);
   ImGui::Separator();
-  ImGui::Text("Truth targets: %zu", measurements.measurements.size());
+  ImGui::Text("Truth targets: %zu", truth.size());
+  ImGui::Text("Measurements: %zu", measurements.measurements.size());
   ImGui::Text("Tracks alive: %zu", tracks.size());
   ImGui::Spacing();
   ImGui::Text("Display");

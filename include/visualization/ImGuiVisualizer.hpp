@@ -58,6 +58,7 @@ private:
   void renderTrackTrails() const;
   void showControlPanels(const MeasurementSet_t &measurements,
                          const std::vector<TrackState> &tracks,
+                         const std::vector<TargetState_t> &truth,
                          int scanId,
                          double timeElapsed);
   void showMetricsWindow(const MeasurementSet_t &measurements,
