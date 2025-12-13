@@ -1,0 +1,29 @@
+# Build & IDE artifacts
+build_debug/
+build_release/
+cmake/
+.vscode/
+
+# CMake preset files
+CMakePresets.json
+CMakeUserPresets.json
+
+# Logs
+rfs_app.log
+rfs_app_debug.log
+
+# Generated binaries
+*.exe
+*.lib
+*.exp
+*.obj
+
+# Conan generated files
+conanbuild.bat
+conanrun.bat
+
+# Visual Studio files
+*.sln
+*.vcxproj*
+
+.vs/
