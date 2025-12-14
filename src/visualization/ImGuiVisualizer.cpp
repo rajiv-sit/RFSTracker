@@ -359,7 +359,7 @@ void ImGuiVisualizer::showMetricsWindow(const MeasurementSet_t &measurements,
   ImGui::Spacing();
   if (options_.showTrackDetails) {
     ImGui::Text("Track Details");
-    ImGui::Columns(7, nullptr, false);
+    ImGui::Columns(6, nullptr, false);
     ImGui::Text("ID"); ImGui::NextColumn();
     ImGui::Text("Status"); ImGui::NextColumn();
     ImGui::Text("Pos"); ImGui::NextColumn();
