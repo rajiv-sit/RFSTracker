@@ -1,13 +1,19 @@
 #pragma once
 
-#include "filters/RepresentationFilter.hpp"
+#include "filters/MbFilter.hpp"
 
 namespace rfs {
 
-/** @brief GLMB filter building global hypotheses over labeled MB. */
-class GlmbFilter : public RepresentationFilter {
+class GlmbFilter : public MbFilter {
 public:
-  explicit GlmbFilter(std::unique_ptr<IRepresentation> representation);
+  explicit GlmbFilter(RepresentationType representationType,
+                      const TrackerConfig *config);
+
+  void update(const MeasurementSet_t &measurements) override;
+  EstimatorOutput_t estimate() const override;
+
+private:
+  double globalWeight_ = 1.0;
 };
 
 } // namespace rfs

@@ -7,7 +7,7 @@
   "clutterRate": 15.0,
   "snrDb": 20.0,
   "enableVisualization": true,
-  "filterFamily": "PHD",
+  "filterFamily": "GLMB",
   "representation": "GaussianMixture", 
   "sensors": [
     {

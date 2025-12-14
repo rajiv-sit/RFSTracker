@@ -1,13 +1,39 @@
 #pragma once
 
-#include "filters/RepresentationFilter.hpp"
+#include "config/TrackerConfig.hpp"
+#include "filters/IrfsFilter.hpp"
+#include "representations/RepresentationFactory.hpp"
+#include "simulation/MeasurementSet.hpp"
+
+#include <memory>
+#include <vector>
 
 namespace rfs {
 
-/** @brief Multi-Bernoulli filter managing Bernoulli track set. */
-class MbFilter : public RepresentationFilter {
+class MbFilter : public IrfsFilter {
 public:
-  explicit MbFilter(std::unique_ptr<IRepresentation> representation);
+  explicit MbFilter(RepresentationType representationType,
+                    const TrackerConfig *config);
+
+  void predict(double dt) override;
+  void update(const MeasurementSet_t &measurements) override;
+  EstimatorOutput_t estimate() const override;
+
+protected:
+  struct BernoulliHypothesis {
+    std::unique_ptr<IRepresentation> representation;
+    double existence = 0.5;
+  };
+
+  const std::vector<BernoulliHypothesis> &hypotheses() const;
+
+  std::unique_ptr<IRepresentation> createEmptyRepresentation() const;
+  void pruneHypotheses();
+  double detectionProbability() const;
+
+  std::vector<BernoulliHypothesis> hypotheses_;
+  RepresentationType representationType_;
+  const TrackerConfig *config_;
 };
 
 } // namespace rfs

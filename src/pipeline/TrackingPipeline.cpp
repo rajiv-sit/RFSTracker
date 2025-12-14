@@ -72,21 +72,24 @@ bool TrackingPipeline::shouldStop() const {
 }
 
 void TrackingPipeline::instantiateFilter() {
-  auto representation = createRepresentation(config_->representation);
   switch (config_->filterFamily) {
-  case FilterFamily::CPHD:
+  case FilterFamily::CPHD: {
+    auto representation = createRepresentation(config_->representation);
     filter_ = std::make_unique<CphdFilter>(std::move(representation));
     break;
+  }
   case FilterFamily::MB:
-    filter_ = std::make_unique<MbFilter>(std::move(representation));
+    filter_ = std::make_unique<MbFilter>(config_->representation, config_.get());
     break;
   case FilterFamily::GLMB:
-    filter_ = std::make_unique<GlmbFilter>(std::move(representation));
+    filter_ = std::make_unique<GlmbFilter>(config_->representation, config_.get());
     break;
   case FilterFamily::PHD:
-  default:
+  default: {
+    auto representation = createRepresentation(config_->representation);
     filter_ = std::make_unique<PhdFilter>(std::move(representation));
     break;
+  }
   }
 }
 
