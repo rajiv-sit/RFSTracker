@@ -133,16 +133,23 @@ DenseVector BSpline::Builder::computeCoefficients(const BSpline& bspline) const
 
     if (!solveAsDense)
     {
+        if (A.rows() != A.cols())
+        {
+            solveAsDense = true;
+        }
+        else
+        {
 #ifndef NDEBUG
-        std::cout
-            << "BSpline::Builder::computeBSplineCoefficients: Computing B-spline control points using sparse solver."
-            << std::endl;
+            std::cout
+                << "BSpline::Builder::computeBSplineCoefficients: Computing B-spline control points using sparse solver."
+                << std::endl;
 #endif // NDEBUG
 
-        SparseLU<> s;
-        // bool successfulSolve = (s.solve(A,Bx,Cx) && s.solve(A,By,Cy));
+            SparseLU<> s;
+            // bool successfulSolve = (s.solve(A,Bx,Cx) && s.solve(A,By,Cy));
 
-        solveAsDense = !s.solve(A, b, x);
+            solveAsDense = !s.solve(A, b, x);
+        }
     }
 
     if (solveAsDense)

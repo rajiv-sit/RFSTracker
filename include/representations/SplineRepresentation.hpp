@@ -4,6 +4,7 @@
 
 #include <Eigen/Dense>
 #include <bspline.h>
+#include <map>
 #include <memory>
 #include <vector>
 
@@ -27,6 +28,10 @@ private:
   std::unique_ptr<SPLINTER::BSpline> bsplineX_;
   std::unique_ptr<SPLINTER::BSpline> bsplineY_;
   std::vector<double> evaluationTimes_;
+  std::map<double, Eigen::Vector2d> measurementHistory_;
+  static constexpr size_t numBasisFunctions_ = 12;
+  static constexpr size_t minSplineSamples_ = numBasisFunctions_;
+  static constexpr size_t maxHistorySamples_ = 128;
 };
 
 } // namespace rfs
