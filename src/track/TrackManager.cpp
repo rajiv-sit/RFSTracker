@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace rfs {
 
@@ -13,9 +14,7 @@ void TrackManager::update(const MeasurementSet_t &measurements) {
     for (auto &track : tracks_) {
       ++track.misses;
     }
-    tracks_.erase(std::remove_if(tracks_.begin(), tracks_.end(),
-                                 [](const TrackState &track) { return track.misses > 3; }),
-                  tracks_.end());
+    pruneDeadTracks();
     return;
   }
 
@@ -114,9 +113,9 @@ void TrackManager::update(const MeasurementSet_t &measurements) {
     }
   }
 
-  tracks_.erase(std::remove_if(tracks_.begin(), tracks_.end(),
-                               [](const TrackState &track) { return track.misses > 3; }),
-                tracks_.end());
+  constexpr int kMaxMissesBeforeDrop = 2;
+  std::vector<std::pair<int, int>> droppedTruths;
+  pruneDeadTracks();
 }
 
 const std::vector<TrackState> &TrackManager::tracks() const {
@@ -131,6 +130,31 @@ TrackStatus TrackManager::statusForHits(int hits) const {
     return TrackStatus::Tentative;
   }
   return TrackStatus::Confirmed;
+}
+
+void TrackManager::pruneDeadTracks() {
+  std::vector<std::pair<int, int>> droppedTruths;
+  tracks_.erase(
+      std::remove_if(
+          tracks_.begin(),
+          tracks_.end(),
+          [&](const TrackState &track) {
+            if (track.misses > kMaxMissesBeforeDrop) {
+              if (track.truthId.has_value()) {
+                droppedTruths.emplace_back(*track.truthId, track.id);
+              }
+              return true;
+            }
+            return false;
+          }),
+      tracks_.end());
+
+  for (const auto &[truthIdValue, droppedTrackId] : droppedTruths) {
+    const auto it = truthIdToTrackId_.find(truthIdValue);
+    if (it != truthIdToTrackId_.end() && it->second == droppedTrackId) {
+      truthIdToTrackId_.erase(it);
+    }
+  }
 }
 
 std::optional<int> TrackManager::canonicalTrackId(int truthId) const {

@@ -36,6 +36,8 @@ private:
   TrackStatus statusForHits(int hits) const;
   std::optional<int> canonicalTrackId(int truthId) const;
   int allocateTrackIdForTruth(int truthId);
+  void pruneDeadTracks();
+  static constexpr int kMaxMissesBeforeDrop = 2;
 
   std::vector<TrackState> tracks_;
   int nextId_ = 0;

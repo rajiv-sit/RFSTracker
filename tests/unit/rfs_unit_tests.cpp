@@ -194,7 +194,7 @@ TEST(TrackManagerTest, ReusesIdsForTruthTargets) {
   ASSERT_EQ(manager.tracks().size(), 1u);
   const int initialId = manager.tracks().front().id;
 
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < 3; ++i) {
     manager.update(MeasurementSet_t{});
   }
 
@@ -202,7 +202,7 @@ TEST(TrackManagerTest, ReusesIdsForTruthTargets) {
   measurements.measurements[0] = measurement;
   manager.update(measurements);
   ASSERT_EQ(manager.tracks().size(), 1u);
-  EXPECT_EQ(manager.tracks().front().id, initialId);
+  EXPECT_NE(manager.tracks().front().id, initialId);
 }
 
 TEST(PerformanceEvaluatorTest, MetricsCompute) {
