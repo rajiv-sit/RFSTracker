@@ -15,6 +15,7 @@
 #include <fstream>
 #include <filesystem>
 #include <gtest/gtest.h>
+#include <unordered_set>
 #include <vector>
 
 using namespace rfs;
@@ -181,7 +182,26 @@ TEST(TrackManagerTest, CreatesTracksFromMeasurements) {
   EXPECT_EQ(manager.tracks().size(), 2u);
 }
 
-TEST(TrackManagerTest, ReusesIdsForTruthTargets) {
+TEST(TrackManagerTest, DistinctIdsForNewTracks) {
+  TrackManager manager;
+  MeasurementSet_t measurements;
+  for (int i = 0; i < 3; ++i) {
+    Measurement_t measurement;
+    measurement.value = Eigen::Vector2d(i * 1.1, i * -0.9);
+    measurement.time = 0.1 * i;
+    measurements.measurements.push_back(measurement);
+  }
+
+  manager.update(measurements);
+  ASSERT_EQ(manager.tracks().size(), 3u);
+  std::unordered_set<int> ids;
+  for (const auto &track : manager.tracks()) {
+    ids.insert(track.id);
+  }
+  EXPECT_EQ(ids.size(), manager.tracks().size());
+}
+
+TEST(TrackManagerTest, NewIdAfterDrop) {
   TrackManager manager;
   MeasurementSet_t measurements;
   Measurement_t measurement;
@@ -193,6 +213,7 @@ TEST(TrackManagerTest, ReusesIdsForTruthTargets) {
   manager.update(measurements);
   ASSERT_EQ(manager.tracks().size(), 1u);
   const int initialId = manager.tracks().front().id;
+  EXPECT_GT(initialId, 0);
 
   for (int i = 0; i < 3; ++i) {
     manager.update(MeasurementSet_t{});
@@ -203,6 +224,28 @@ TEST(TrackManagerTest, ReusesIdsForTruthTargets) {
   manager.update(measurements);
   ASSERT_EQ(manager.tracks().size(), 1u);
   EXPECT_NE(manager.tracks().front().id, initialId);
+  EXPECT_GT(manager.tracks().front().id, initialId);
+}
+
+TEST(TrackManagerTest, KeepsStableIdWhileAlive) {
+  TrackManager manager;
+  MeasurementSet_t measurements;
+  Measurement_t measurement;
+  measurement.value = Eigen::Vector2d(3.0, -1.0);
+  measurement.time = 1.0;
+  measurement.truthId = 24;
+  measurements.measurements.push_back(measurement);
+
+  manager.update(measurements);
+  ASSERT_EQ(manager.tracks().size(), 1u);
+  const int id = manager.tracks().front().id;
+
+  measurement.time = 2.0;
+  measurements.measurements[0] = measurement;
+  manager.update(measurements);
+
+  ASSERT_EQ(manager.tracks().size(), 1u);
+  EXPECT_EQ(manager.tracks().front().id, id);
 }
 
 TEST(PerformanceEvaluatorTest, MetricsCompute) {

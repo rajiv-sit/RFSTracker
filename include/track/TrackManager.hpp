@@ -2,7 +2,9 @@
 
 #include "association/HungarianSolver.hpp"
 #include "simulation/MeasurementSet.hpp"
+
 #include <Eigen/Dense>
+#include <optional>
 #include <vector>
 
 namespace rfs {
@@ -17,6 +19,7 @@ struct TrackState {
   int misses = 0;
   double lastUpdateTime = 0.0;
   TrackStatus status = TrackStatus::Newborn;
+  std::optional<int> truthId;
 };
 
 /** @brief Manages track lifecycle using assignment. */
@@ -32,7 +35,7 @@ private:
   void pruneDeadTracks();
 
   std::vector<TrackState> tracks_;
-  int nextId_ = 0;
+  int nextId_ = 1;
   HungarianSolver solver_;
 };
 

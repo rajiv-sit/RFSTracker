@@ -1,7 +1,6 @@
 #include "track/TrackManager.hpp"
 
 #include <algorithm>
-#include <cmath>
 
 namespace rfs {
 
@@ -27,6 +26,7 @@ void TrackManager::update(const MeasurementSet_t &measurements) {
       track.hits = 1;
       track.lastUpdateTime = measurement.time;
       track.status = TrackStatus::Newborn;
+      track.truthId = measurement.truthId;
       tracks_.push_back(track);
     }
     return;
@@ -63,6 +63,8 @@ void TrackManager::update(const MeasurementSet_t &measurements) {
         track.velocity = Eigen::Vector2d::Zero();
       }
 
+      track.truthId = measurement.truthId;
+
       track.hits += 1;
       track.misses = 0;
       track.lastUpdateTime = measurement.time;
@@ -81,6 +83,7 @@ void TrackManager::update(const MeasurementSet_t &measurements) {
       newTrack.hits = 1;
       newTrack.lastUpdateTime = measurementList[j].time;
       newTrack.status = TrackStatus::Newborn;
+      newTrack.truthId = measurementList[j].truthId;
       tracks_.push_back(newTrack);
     }
   }
@@ -104,10 +107,8 @@ TrackStatus TrackManager::statusForHits(int hits) const {
 
 void TrackManager::pruneDeadTracks() {
   tracks_.erase(
-      std::remove_if(
-          tracks_.begin(),
-          tracks_.end(),
-          [](const TrackState &track) { return track.misses > kMaxMissesBeforeDrop; }),
+      std::remove_if(tracks_.begin(), tracks_.end(),
+                     [](const TrackState &track) { return track.misses > kMaxMissesBeforeDrop; }),
       tracks_.end());
 }
 
