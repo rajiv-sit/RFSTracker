@@ -1,3 +1,4 @@
+#include "association/Hungarian.hpp"
 #include "association/HungarianSolver.hpp"
 #include "config/TrackerConfig.hpp"
 #include "numerics/NumericsUtils.hpp"
@@ -130,6 +131,41 @@ TEST(HungarianSolverTest, SimpleAssignment) {
   EXPECT_EQ(result.assignment[0], 0);
   EXPECT_EQ(result.assignment[1], 1);
   EXPECT_NEAR(result.totalCost, 5.0, 1e-6);
+}
+
+TEST(HungarianTemplateTest, SimpleMatrix) {
+  Eigen::Matrix<double, 2, 2> matrix;
+  matrix << 1.0, 2.0, 3.0, 4.0;
+  Hungarian<double> solver(matrix);
+  EXPECT_TRUE(solver.getStatus());
+  const auto assignment = solver.assignmentZeroIndexed();
+  ASSERT_EQ(assignment.size(), 2u);
+  EXPECT_EQ(assignment[0], 0);
+  EXPECT_EQ(assignment[1], 1);
+  EXPECT_NEAR(solver.getOverAllCost(), 5.0, 1e-6);
+}
+
+TEST(HungarianTemplateTest, RowExceedsColumns) {
+  Eigen::Matrix<double, 3, 2> matrix;
+  matrix << 1.0, 3.0, 2.0, 4.0, 10.0, 10.0;
+  Hungarian<double> solver(matrix);
+  EXPECT_TRUE(solver.getStatus());
+  const auto assignment = solver.assignmentZeroIndexed();
+  ASSERT_EQ(assignment.size(), 3u);
+  EXPECT_EQ(assignment[0], 0);
+  EXPECT_EQ(assignment[1], 1);
+  EXPECT_GE(assignment[2], matrix.cols());
+  EXPECT_NEAR(solver.getOverAllCost(), 5.0, 1e-6);
+}
+
+TEST(HungarianSolverTest, RectangularAssignment) {
+  HungarianSolver solver;
+  CostMatrix_t cost = {{1.0, 3.0}, {2.0, 4.0}, {10.0, 10.0}};
+  const auto result = solver.solve(cost);
+  ASSERT_EQ(result.assignment.size(), 3u);
+  EXPECT_EQ(result.assignment[0], 0);
+  EXPECT_EQ(result.assignment[1], 1);
+  EXPECT_EQ(result.assignment[2], -1);
 }
 
 TEST(TrackManagerTest, CreatesTracksFromMeasurements) {

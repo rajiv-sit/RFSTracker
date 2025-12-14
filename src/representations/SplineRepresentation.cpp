@@ -5,6 +5,7 @@
 #include <datatable.h>
 
 #include <algorithm>
+#include <iostream>
 
 namespace rfs {
 
@@ -13,13 +14,16 @@ void SplineRepresentation::update(const MeasurementSet_t &measurements) {
     return;
   }
 
-  const double time = measurements.measurements.front().time;
-  Eigen::Vector2d sum = Eigen::Vector2d::Zero();
+  std::map<double, Eigen::Vector2d> accumulated;
+  std::map<double, size_t> counts;
   for (const auto &measurement : measurements.measurements) {
-    sum += measurement.value;
+    accumulated[measurement.time] += measurement.value;
+    ++counts[measurement.time];
   }
-  measurementHistory_[time] = sum / static_cast<double>(measurements.measurements.size());
-  if (measurementHistory_.size() > maxHistorySamples_) {
+  for (const auto &[time, sum] : accumulated) {
+    measurementHistory_[time] = sum / static_cast<double>(counts[time]);
+  }
+  while (measurementHistory_.size() > maxHistorySamples_) {
     measurementHistory_.erase(measurementHistory_.begin());
   }
 
@@ -46,7 +50,24 @@ void SplineRepresentation::update(const MeasurementSet_t &measurements) {
 
 std::vector<Eigen::Vector4d> SplineRepresentation::estimate() const {
   std::vector<Eigen::Vector4d> states;
+  std::cerr << "SplineRepresentation::estimate history=" << measurementHistory_.size()
+            << " bsplineX=" << static_cast<bool>(bsplineX_)
+            << " bsplineY=" << static_cast<bool>(bsplineY_)
+            << " evalTimes=" << evaluationTimes_.size() << "\n";
+  if ((!bsplineX_ || !bsplineY_) && measurementHistory_.empty()) {
+    return states;
+  }
+
   if (!bsplineX_ || !bsplineY_ || evaluationTimes_.empty()) {
+    states.reserve(measurementHistory_.size());
+    for (const auto &[time, position] : measurementHistory_) {
+      Eigen::Vector4d state;
+      state[0] = position.x();
+      state[1] = position.y();
+      state[2] = 0.0;
+      state[3] = 0.0;
+      states.push_back(state);
+    }
     return states;
   }
 
@@ -76,9 +97,15 @@ std::unique_ptr<SPLINTER::BSpline> SplineRepresentation::buildSpline(
       return nullptr;
     }
 
+    const size_t sampleCount = static_cast<size_t>(table.getNumSamples());
+    const size_t basisFunctions = std::min(numBasisFunctions_, sampleCount);
+    if (basisFunctions == 0) {
+      return nullptr;
+    }
+
     SPLINTER::BSpline::Builder builder(table);
     builder.degree(3)
-        .numBasisFunctions(numBasisFunctions_)
+        .numBasisFunctions(basisFunctions)
         .knotSpacing(SPLINTER::BSpline::KnotSpacing::EQUIDISTANT)
         .smoothing(SPLINTER::BSpline::Smoothing::NONE);
 

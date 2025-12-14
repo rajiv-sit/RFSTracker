@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AssignmentSolver.hpp"
+#include "association/Hungarian.hpp"
 
 namespace rfs {
 

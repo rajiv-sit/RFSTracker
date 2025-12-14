@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <vector>
+#include <Eigen/Dense>
 
 namespace rfs {
 
@@ -31,42 +33,43 @@ void MbFilter::update(const MeasurementSet_t &measurements) {
     return;
   }
 
-  std::vector<bool> assigned(measurements.measurements.size(), false);
-  for (auto &hypothesis : hypotheses_) {
-    const auto states = hypothesis.representation->estimate();
-    bool hit = false;
-    size_t bestIdx = 0;
-    double bestDist = std::numeric_limits<double>::infinity();
+  const size_t hypCount = hypotheses_.size();
+  const size_t measurementCount = measurements.measurements.size();
+  std::vector<std::vector<double>> costMatrix(hypCount, std::vector<double>(measurementCount));
+  for (size_t i = 0; i < hypCount; ++i) {
+    const auto states = hypotheses_[i].representation->estimate();
+    Eigen::Vector2d statePos = Eigen::Vector2d::Zero();
     if (!states.empty()) {
-      const auto position = states.front().head<2>();
-      for (size_t measurementIdx = 0; measurementIdx < measurements.measurements.size();
-           ++measurementIdx) {
-        const double distance =
-            (position - measurements.measurements[measurementIdx].value).norm();
-        if (distance < bestDist) {
-          bestDist = distance;
-          bestIdx = measurementIdx;
-        }
-      }
-      if (bestDist < kGatingThreshold) {
-        hit = true;
-        assigned[bestIdx] = true;
-      }
+      statePos = states.front().head<2>();
     }
+    for (size_t j = 0; j < measurementCount; ++j) {
+      costMatrix[i][j] = (statePos - measurements.measurements[j].value).norm();
+    }
+  }
 
-    MeasurementSet_t localMeasurements;
-    if (hit) {
-      localMeasurements.measurements.push_back(measurements.measurements[bestIdx]);
+  AssociationResult_t assignment = solver_.solve(costMatrix);
+  std::vector<bool> measurementAssigned(measurementCount, false);
+
+  for (size_t i = 0; i < hypCount; ++i) {
+    auto &hypothesis = hypotheses_[i];
+    int measurementIdx = -1;
+    if (i < assignment.assignment.size()) {
+      measurementIdx = assignment.assignment[i];
+    }
+    if (measurementIdx >= 0 && static_cast<size_t>(measurementIdx) < measurementCount) {
+      MeasurementSet_t localMeasurements;
+      localMeasurements.measurements.push_back(measurements.measurements[measurementIdx]);
       hypothesis.representation->update(localMeasurements);
       hypothesis.existence =
           std::min(1.0, hypothesis.existence + kExistenceBoost * detectionProbability());
+      measurementAssigned[measurementIdx] = true;
     } else {
       hypothesis.existence = std::max(0.0, hypothesis.existence - kExistenceDecay);
     }
   }
 
-  for (size_t idx = 0; idx < measurements.measurements.size(); ++idx) {
-    if (assigned[idx]) {
+  for (size_t idx = 0; idx < measurementCount; ++idx) {
+    if (measurementAssigned[idx]) {
       continue;
     }
     BernoulliHypothesis born;
@@ -75,6 +78,7 @@ void MbFilter::update(const MeasurementSet_t &measurements) {
     localMeasurements.measurements.push_back(measurements.measurements[idx]);
     born.representation->update(localMeasurements);
     born.existence = 0.5;
+    born.id = nextHypothesisId_++;
     hypotheses_.push_back(std::move(born));
   }
 

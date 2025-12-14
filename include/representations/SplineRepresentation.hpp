@@ -30,7 +30,7 @@ private:
   std::vector<double> evaluationTimes_;
   std::map<double, Eigen::Vector2d> measurementHistory_;
   static constexpr size_t numBasisFunctions_ = 12;
-  static constexpr size_t minSplineSamples_ = numBasisFunctions_;
+  static constexpr size_t minSplineSamples_ = 5;
   static constexpr size_t maxHistorySamples_ = 128;
 };
 
