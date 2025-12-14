@@ -13,6 +13,7 @@
 namespace rfs {
 
 constexpr int kMaxMissesBeforeDrop = 2;
+constexpr double kConfirmedVelocityThreshold = 0.1;
 
 namespace {
 struct TrackLogWriter {
@@ -214,7 +215,10 @@ void TrackManager::pruneDeadTracks() {
 void TrackManager::refreshConfirmedTracks() {
   confirmedTracks_.clear();
   std::copy_if(tracks_.begin(), tracks_.end(), std::back_inserter(confirmedTracks_),
-               [](const TrackState &track) { return track.status == TrackStatus::Confirmed; });
+               [](const TrackState &track) {
+                 return track.status == TrackStatus::Confirmed &&
+                        track.velocity.norm() > kConfirmedVelocityThreshold;
+               });
 }
 
 } // namespace rfs
