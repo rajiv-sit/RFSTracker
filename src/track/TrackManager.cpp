@@ -2,9 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <utility>
 
 namespace rfs {
+
+constexpr int kMaxMissesBeforeDrop = 2;
 
 TrackManager::TrackManager() = default;
 
@@ -18,42 +19,14 @@ void TrackManager::update(const MeasurementSet_t &measurements) {
     return;
   }
 
-  const auto createTrackId = [this](const std::optional<int> &truthId) {
-    if (!truthId.has_value()) {
-      return nextId_++;
-    }
-    const int truthIndex = *truthId;
-    if (const auto existing = canonicalTrackId(truthIndex); existing.has_value()) {
-      return *existing;
-    }
-    return allocateTrackIdForTruth(truthIndex);
-  };
-
-  const auto bindTruthIdToTrack =
-      [this](TrackState &track, const std::optional<int> &truthId) {
-        if (!truthId.has_value()) {
-          return;
-        }
-        const int truthIndex = *truthId;
-        if (const auto existing = canonicalTrackId(truthIndex); existing.has_value()) {
-          track.id = *existing;
-        } else if (track.id < 0) {
-          track.id = allocateTrackIdForTruth(truthIndex);
-        } else {
-          truthIdToTrackId_.emplace(truthIndex, track.id);
-        }
-        track.truthId = truthId;
-      };
-
   if (tracks_.empty()) {
     for (const auto &measurement : measurementList) {
       TrackState track;
-      track.id = createTrackId(measurement.truthId);
+      track.id = nextId_++;
       track.position = measurement.value;
       track.hits = 1;
       track.lastUpdateTime = measurement.time;
       track.status = TrackStatus::Newborn;
-      bindTruthIdToTrack(track, measurement.truthId);
       tracks_.push_back(track);
     }
     return;
@@ -62,6 +35,7 @@ void TrackManager::update(const MeasurementSet_t &measurements) {
   const size_t trackCount = tracks_.size();
   const size_t measurementCount = measurementList.size();
   CostMatrix_t costMatrix(trackCount, std::vector<double>(measurementCount));
+
   for (size_t i = 0; i < trackCount; ++i) {
     for (size_t j = 0; j < measurementCount; ++j) {
       const double distance = (tracks_[i].position - measurementList[j].value).norm();
@@ -86,35 +60,31 @@ void TrackManager::update(const MeasurementSet_t &measurements) {
       if (deltaTime > 1e-6) {
         track.velocity = (measurement.value - previousPosition) / deltaTime;
       } else if (track.hits == 0) {
-      track.velocity = Eigen::Vector2d::Zero();
+        track.velocity = Eigen::Vector2d::Zero();
       }
 
       track.hits += 1;
       track.misses = 0;
       track.lastUpdateTime = measurement.time;
       track.status = statusForHits(track.hits);
-      bindTruthIdToTrack(track, measurement.truthId);
       measurementAssigned[assignment.assignment[i]] = true;
     } else {
-      track.misses += 1;
+      ++track.misses;
     }
   }
 
   for (size_t j = 0; j < measurementCount; ++j) {
     if (!measurementAssigned[j]) {
       TrackState newTrack;
-      newTrack.id = createTrackId(measurementList[j].truthId);
+      newTrack.id = nextId_++;
       newTrack.position = measurementList[j].value;
       newTrack.hits = 1;
       newTrack.lastUpdateTime = measurementList[j].time;
       newTrack.status = TrackStatus::Newborn;
-      bindTruthIdToTrack(newTrack, measurementList[j].truthId);
       tracks_.push_back(newTrack);
     }
   }
 
-  constexpr int kMaxMissesBeforeDrop = 2;
-  std::vector<std::pair<int, int>> droppedTruths;
   pruneDeadTracks();
 }
 
@@ -133,42 +103,12 @@ TrackStatus TrackManager::statusForHits(int hits) const {
 }
 
 void TrackManager::pruneDeadTracks() {
-  std::vector<std::pair<int, int>> droppedTruths;
   tracks_.erase(
       std::remove_if(
           tracks_.begin(),
           tracks_.end(),
-          [&](const TrackState &track) {
-            if (track.misses > kMaxMissesBeforeDrop) {
-              if (track.truthId.has_value()) {
-                droppedTruths.emplace_back(*track.truthId, track.id);
-              }
-              return true;
-            }
-            return false;
-          }),
+          [](const TrackState &track) { return track.misses > kMaxMissesBeforeDrop; }),
       tracks_.end());
-
-  for (const auto &[truthIdValue, droppedTrackId] : droppedTruths) {
-    const auto it = truthIdToTrackId_.find(truthIdValue);
-    if (it != truthIdToTrackId_.end() && it->second == droppedTrackId) {
-      truthIdToTrackId_.erase(it);
-    }
-  }
-}
-
-std::optional<int> TrackManager::canonicalTrackId(int truthId) const {
-  const auto it = truthIdToTrackId_.find(truthId);
-  if (it == truthIdToTrackId_.end()) {
-    return std::nullopt;
-  }
-  return it->second;
-}
-
-int TrackManager::allocateTrackIdForTruth(int truthId) {
-  const int id = nextId_++;
-  truthIdToTrackId_[truthId] = id;
-  return id;
 }
 
 } // namespace rfs
