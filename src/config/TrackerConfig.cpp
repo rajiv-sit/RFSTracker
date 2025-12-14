@@ -19,6 +19,7 @@ TrackerConfig TrackerConfig::defaultConfig() {
   config.enableVisualization = true;
   config.filterFamily = FilterFamily::PHD;
   config.representation = RepresentationType::GaussianMixture;
+  config.loggerVerbose = true;
 
   config.sensors = {{
       SensorType::Radar,
@@ -87,6 +88,12 @@ bool TrackerConfig::loadFromJson(const std::string &path) {
   }
   if (document.contains("enableVisualization")) {
     enableVisualization = document["enableVisualization"].get<bool>();
+  }
+  if (document.contains("logger_verbose")) {
+    loggerVerbose = document["logger_verbose"].get<bool>();
+  }
+  if (document.contains("loggerVerbose")) {
+    loggerVerbose = document["loggerVerbose"].get<bool>();
   }
 
   if (document.contains("sensors") && document["sensors"].is_array()) {

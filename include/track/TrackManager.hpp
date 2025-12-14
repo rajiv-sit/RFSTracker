@@ -29,12 +29,15 @@ public:
 
   void update(const MeasurementSet_t &measurements);
   const std::vector<TrackState> &tracks() const;
+  const std::vector<TrackState> &confirmedTracks() const;
 
 private:
   TrackStatus statusForHits(int hits) const;
   void pruneDeadTracks();
+  void refreshConfirmedTracks();
 
   std::vector<TrackState> tracks_;
+  std::vector<TrackState> confirmedTracks_;
   int nextId_ = 1;
   HungarianSolver solver_;
 };

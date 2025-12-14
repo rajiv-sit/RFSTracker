@@ -1,8 +1,10 @@
+#include "association/AssociationLogger.hpp"
 #include "association/HungarianSolver.hpp"
 
 #include "association/Hungarian.hpp"
 #include <algorithm>
 #include <Eigen/Dense>
+#include <sstream>
 
 namespace rfs {
 
@@ -34,6 +36,17 @@ AssociationResult_t HungarianSolver::solve(const CostMatrix_t &costMatrix) {
   }
 
   result.totalCost = static_cast<double>(solver.getOverAllCost());
+
+  std::ostringstream detail;
+  detail << "HungarianSolver::solve matrix=" << rows << "x" << cols << " assignment=[";
+  for (size_t i = 0; i < assignmentVec.size(); ++i) {
+    if (i > 0) {
+      detail << ",";
+    }
+    detail << assignmentVec[i];
+  }
+  detail << "] totalCost=" << result.totalCost;
+  logAssociation(detail.str());
   return result;
 }
 

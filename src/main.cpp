@@ -1,4 +1,5 @@
 #include "config/TrackerConfig.hpp"
+#include "logging/LoggerControl.hpp"
 #include "pipeline/TrackingPipeline.hpp"
 #include "visualization/ImGuiVisualizer.hpp"
 
@@ -8,6 +9,9 @@
 #include <memory>
 
 void logMessage(const std::string &message) {
+  if (!rfs::loggerVerboseEnabled()) {
+    return;
+  }
   std::ofstream log("rfs_app_debug.log", std::ios::app);
   log << message << std::endl;
 }
@@ -43,6 +47,8 @@ int main(int argc, char **argv) {
     logMessage("main: config invalid");
     return 1;
   }
+
+  rfs::setLoggerVerbose(config->loggerVerbose);
 
   auto visualizer = std::make_unique<rfs::ImGuiVisualizer>(config);
   if (!visualizer->initialize()) {

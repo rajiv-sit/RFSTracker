@@ -1,8 +1,10 @@
+#include "filters/FilterLogger.hpp"
 #include "filters/MbFilter.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <sstream>
 #include <vector>
 #include <Eigen/Dense>
 
@@ -18,6 +20,9 @@ MbFilter::MbFilter(RepresentationType representationType, const TrackerConfig *c
     : representationType_(representationType), config_(config) {}
 
 void MbFilter::predict(double dt) {
+  std::ostringstream detail;
+  detail << "dt=" << dt << " hypothesisCount=" << hypotheses_.size();
+  logFilterAction("MbFilter", "predict", detail.str());
   for (auto &hypothesis : hypotheses_) {
     hypothesis.representation->predict(dt);
     hypothesis.existence = std::max(0.0, hypothesis.existence - 0.005);
@@ -25,6 +30,9 @@ void MbFilter::predict(double dt) {
 }
 
 void MbFilter::update(const MeasurementSet_t &measurements) {
+  std::ostringstream detail;
+  detail << "measurements=" << measurements.measurements.size();
+  logFilterAction("MbFilter", "update", detail.str());
   if (measurements.measurements.empty()) {
     for (auto &hypothesis : hypotheses_) {
       hypothesis.existence = std::max(0.0, hypothesis.existence - kExistenceDecay);

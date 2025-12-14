@@ -7,22 +7,32 @@
 #include <limits>
 #include <sstream>
 #include <string>
+#include "logging/LoggerControl.hpp"
 #include "representations/RepresentationLogger.hpp"
 
 namespace rfs {
 
 namespace {
-constexpr double kGatingRadius = 5.0;
-constexpr double kBaseGatingRadius = 5.0;
+constexpr double kGatingRadius = 20.0;
+constexpr double kBaseGatingRadius = 20.0;
 constexpr double kMaxAdaptiveGate = 40.0;
 constexpr double kGatePromotion = 5.0;
 constexpr double kWeightDecay = 0.2;
 struct GaussianLogWriter {
-  GaussianLogWriter() : stream("representation_debug.log", std::ios::trunc) {}
-
   void logLine(const std::string &line) {
+    if (!loggerVerboseEnabled()) {
+      return;
+    }
+    ensureStream();
     stream << line << '\n';
     stream.flush();
+  }
+
+ private:
+  void ensureStream() {
+    if (!stream.is_open()) {
+      stream.open("representation_debug.log", std::ios::trunc);
+    }
   }
 
   std::ofstream stream;
@@ -164,18 +174,8 @@ void GaussianRepresentation::update(const MeasurementSet_t &measurements) {
     logger().logLine(summary.str());
   }
 
-  for (const auto &measurement : gatedMeasurements) {
-    GaussianComponent_t component;
-    component.mean.head<2>() = measurement.value;
-    component.mean[2] = 0.0;
-    component.mean[3] = 0.0;
-    component.covariance = Eigen::Matrix4d::Identity();
-    component.weight = 1.0;
-    components_.push_back(component);
-  }
-
-  prune();
-  merge();
+  prune(updatedComponents, 1e-3);
+  merge(updatedComponents);
 
   components_ = std::move(updatedComponents);
 
@@ -226,39 +226,48 @@ void GaussianRepresentation::addComponent(const GaussianComponent_t &component) 
 }
 
 void GaussianRepresentation::prune(double weightThreshold) {
-  components_.erase(
-      std::remove_if(components_.begin(), components_.end(),
+  prune(components_, weightThreshold);
+}
+
+void GaussianRepresentation::prune(std::vector<GaussianComponent_t> &components,
+                                    double weightThreshold) {
+  components.erase(
+      std::remove_if(components.begin(), components.end(),
                      [weightThreshold](const GaussianComponent_t &component) {
                        return component.weight < weightThreshold || component.hits <= 0;
                      }),
-      components_.end());
+      components.end());
 }
 
 void GaussianRepresentation::merge() {
-  if (components_.size() <= 1) {
+  merge(components_);
+}
+
+void GaussianRepresentation::merge(std::vector<GaussianComponent_t> &components) {
+  if (components.size() <= 1) {
     return;
   }
 
-  std::vector<bool> visited(components_.size(), false);
+  std::vector<bool> visited(components.size(), false);
   std::vector<GaussianComponent_t> mergedComponents;
-  for (size_t i = 0; i < components_.size(); ++i) {
+  for (size_t i = 0; i < components.size(); ++i) {
     if (visited[i]) {
       continue;
     }
-    GaussianComponent_t aggregate = components_[i];
+    GaussianComponent_t aggregate = components[i];
     double totalWeight = aggregate.weight;
     int totalHits = aggregate.hits;
     Eigen::Vector4d mean = aggregate.mean * aggregate.weight;
     Eigen::Matrix4d covariance = aggregate.covariance * aggregate.weight;
     visited[i] = true;
 
-    for (size_t j = i + 1; j < components_.size(); ++j) {
+    for (size_t j = i + 1; j < components.size(); ++j) {
       if (visited[j]) {
         continue;
       }
-      const double dist = distanceToComponent(components_[j], aggregate.mean.head<2>());
+      const double dist = distanceToComponent(components[j], aggregate.mean.head<2>());
       if (dist <= kGatingRadius) {
-        const auto &comp = components_[j];
+        const auto &comp = components[j];
         visited[j] = true;
         totalWeight += comp.weight;
         totalHits += comp.hits;
@@ -276,7 +285,7 @@ void GaussianRepresentation::merge() {
     mergedComponents.push_back(aggregate);
   }
 
-  components_.swap(mergedComponents);
+  components.swap(mergedComponents);
 }
 
 const std::vector<GaussianComponent_t> &GaussianRepresentation::components() const {

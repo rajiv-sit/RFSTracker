@@ -8,10 +8,12 @@
 
 #include <array>
 #include <cfloat>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <unordered_map>
+#include <limits>
 #include <unordered_set>
 #include <deque>
 #include <vector>
@@ -271,6 +273,8 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
 
   showControlPanels(measurements, tracks, truth, scanId, timeElapsed);
   showMetricsWindow(measurements, tracks, truth, metrics);
+  showTruthPanel(truth);
+  showTrackTruthComparison(tracks, truth);
 
   int displayW, displayH;
   std::vector<Eigen::Vector2d> confirmedTrackPoints;
@@ -354,8 +358,13 @@ void ImGuiVisualizer::showControlPanels(const MeasurementSet_t &measurements,
   ImGui::Checkbox("Show Truth", &options_.showTruth);
   ImGui::Checkbox("Show Measurements", &options_.showMeasurements);
   ImGui::Checkbox("Show Tracks", &options_.showTracks);
+  ImGui::Checkbox("Show Truth Panel", &options_.showTruthDetails);
   if (ImGui::Button(options_.showTrackDetails ? "Hide Track Details" : "Show Track Details")) {
     options_.showTrackDetails = !options_.showTrackDetails;
+  }
+  if (ImGui::Button(options_.showTrackTruthComparison ? "Hide Track / Truth Comparison"
+                                                     : "Show Track / Truth Comparison")) {
+    options_.showTrackTruthComparison = !options_.showTrackTruthComparison;
   }
   ImGui::End();
 }
@@ -416,6 +425,148 @@ void ImGuiVisualizer::showMetricsWindow(const MeasurementSet_t &measurements,
 
     ImGui::Columns(1);
   }
+  if (options_.showTruthDetails) {
+    ImGui::Text("Truth Targets");
+    ImGui::Columns(3, nullptr, false);
+    ImGui::Text("ID");
+    ImGui::NextColumn();
+    ImGui::Text("Position");
+    ImGui::NextColumn();
+    ImGui::Text("Velocity");
+    ImGui::NextColumn();
+    ImGui::Separator();
+    for (const auto &target : truth) {
+      ImGui::Text("%d", target.id);
+      ImGui::NextColumn();
+      ImGui::Text("%.1f, %.1f", target.state.x(), target.state.y());
+      ImGui::NextColumn();
+      ImGui::Text("%.1f, %.1f", target.state.z(), target.state.w());
+      ImGui::NextColumn();
+    }
+    ImGui::Columns(1);
+  }
+  ImGui::End();
+}
+
+void ImGuiVisualizer::showTruthPanel(const std::vector<TargetState_t> &truth) {
+  if (!options_.showTruthDetails) {
+    return;
+  }
+
+  ImGui::Begin("Truth Details");
+  ImGui::Text("Truth targets: %zu", truth.size());
+  ImGui::Separator();
+  ImGui::Columns(3, nullptr, false);
+  ImGui::Text("ID");
+  ImGui::NextColumn();
+  ImGui::Text("Position");
+  ImGui::NextColumn();
+  ImGui::Text("Velocity");
+  ImGui::NextColumn();
+  ImGui::Separator();
+
+  for (const auto &target : truth) {
+    ImGui::Text("%d", target.id);
+    ImGui::NextColumn();
+    ImGui::Text("%.1f, %.1f", target.state.x(), target.state.y());
+    ImGui::NextColumn();
+    ImGui::Text("%.1f, %.1f", target.state.z(), target.state.w());
+    ImGui::NextColumn();
+  }
+
+  ImGui::Columns(1);
+  ImGui::End();
+}
+
+void ImGuiVisualizer::showTrackTruthComparison(const std::vector<TrackState> &tracks,
+                                               const std::vector<TargetState_t> &truth) {
+  if (!options_.showTrackTruthComparison) {
+    return;
+  }
+
+  ImGui::Begin("Track / Truth Comparison");
+  ImGui::Text("Confirmed tracks: %zu", tracks.size());
+  ImGui::Text("Truth targets: %zu", truth.size());
+  ImGui::Separator();
+  ImGui::Columns(7, nullptr, false);
+  ImGui::Text("Track ID"); ImGui::NextColumn();
+  ImGui::Text("Track Pos"); ImGui::NextColumn();
+  ImGui::Text("Track Vel"); ImGui::NextColumn();
+  ImGui::Text("Truth ID"); ImGui::NextColumn();
+  ImGui::Text("Truth Pos"); ImGui::NextColumn();
+  ImGui::Text("Truth Vel"); ImGui::NextColumn();
+  ImGui::Text("Distance"); ImGui::NextColumn();
+  ImGui::Separator();
+
+  std::unordered_map<int, TargetState_t> truthById;
+  for (const auto &target : truth) {
+    truthById[target.id] = target;
+  }
+
+  for (const auto &track : tracks) {
+    const bool hasTruth = track.truthId && truthById.contains(*track.truthId);
+    Eigen::Vector2d truthPos = Eigen::Vector2d::Zero();
+    Eigen::Vector2d truthVel = Eigen::Vector2d::Zero();
+    double distance = std::numeric_limits<double>::quiet_NaN();
+    if (hasTruth) {
+      const auto &truthState = truthById[*track.truthId].state;
+      truthPos = truthState.head<2>();
+      truthVel = truthState.tail<2>();
+      distance = (track.position - truthPos).norm();
+    } else if (!truth.empty()) {
+      Eigen::Vector2d closestPos = truth.front().state.head<2>();
+      Eigen::Vector2d closestVel = truth.front().state.tail<2>();
+      double bestDist = (track.position - closestPos).norm();
+      for (const auto &target : truth) {
+        const double candidateDist = (track.position - target.state.head<2>()).norm();
+        if (candidateDist < bestDist) {
+          bestDist = candidateDist;
+          closestPos = target.state.head<2>();
+          closestVel = target.state.tail<2>();
+        }
+      }
+      truthPos = closestPos;
+      truthVel = closestVel;
+      distance = bestDist;
+    }
+
+    ImGui::Text("%d", track.id);
+    ImGui::NextColumn();
+    ImGui::Text("%.1f, %.1f", track.position.x(), track.position.y());
+    ImGui::NextColumn();
+    ImGui::Text("%.1f, %.1f", track.velocity.x(), track.velocity.y());
+    ImGui::NextColumn();
+    if (hasTruth) {
+      ImGui::Text("%d", *track.truthId);
+    } else {
+      ImGui::Text("N/A");
+    }
+    ImGui::NextColumn();
+    if (hasTruth) {
+      ImGui::Text("%.1f, %.1f", truthPos.x(), truthPos.y());
+    } else if (!truth.empty()) {
+      ImGui::Text("%.1f, %.1f", truthPos.x(), truthPos.y());
+    } else {
+      ImGui::Text("N/A");
+    }
+    ImGui::NextColumn();
+    if (hasTruth) {
+      ImGui::Text("%.1f, %.1f", truthVel.x(), truthVel.y());
+    } else if (!truth.empty()) {
+      ImGui::Text("%.1f, %.1f", truthVel.x(), truthVel.y());
+    } else {
+      ImGui::Text("N/A");
+    }
+    ImGui::NextColumn();
+    if (std::isnan(distance)) {
+      ImGui::Text("N/A");
+    } else {
+      ImGui::Text("%.2f", distance);
+    }
+    ImGui::NextColumn();
+  }
+
+  ImGui::Columns(1);
   ImGui::End();
 }
 

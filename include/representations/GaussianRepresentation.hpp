@@ -29,6 +29,8 @@ public:
   const std::vector<GaussianComponent_t> &components() const;
 
 private:
+  void prune(std::vector<GaussianComponent_t> &components, double weightThreshold);
+  void merge(std::vector<GaussianComponent_t> &components);
   std::vector<GaussianComponent_t> components_;
   std::optional<Eigen::Vector4d> lastEstimate_;
   double adaptiveGate_ = 5.0;

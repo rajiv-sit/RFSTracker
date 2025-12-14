@@ -210,21 +210,29 @@ TEST(TrackManagerTest, NewIdAfterDrop) {
   measurement.truthId = 42;
   measurements.measurements.push_back(measurement);
 
-  manager.update(measurements);
-  ASSERT_EQ(manager.tracks().size(), 1u);
-  const int initialId = manager.tracks().front().id;
+  for (int i = 0; i < 3; ++i) {
+    measurement.time = 1.0 + static_cast<double>(i);
+    measurements.measurements[0] = measurement;
+    manager.update(measurements);
+  }
+
+  ASSERT_EQ(manager.confirmedTracks().size(), 1u);
+  const int initialId = manager.confirmedTracks().front().id;
   EXPECT_GT(initialId, 0);
 
   for (int i = 0; i < 3; ++i) {
     manager.update(MeasurementSet_t{});
   }
 
-  measurement.time = 2.0;
-  measurements.measurements[0] = measurement;
-  manager.update(measurements);
-  ASSERT_EQ(manager.tracks().size(), 1u);
-  EXPECT_NE(manager.tracks().front().id, initialId);
-  EXPECT_GT(manager.tracks().front().id, initialId);
+  for (int i = 0; i < 3; ++i) {
+    measurement.time = 5.0 + static_cast<double>(i);
+    measurements.measurements[0] = measurement;
+    manager.update(measurements);
+  }
+
+  ASSERT_EQ(manager.confirmedTracks().size(), 1u);
+  EXPECT_NE(manager.confirmedTracks().front().id, initialId);
+  EXPECT_GT(manager.confirmedTracks().front().id, initialId);
 }
 
 TEST(TrackManagerTest, KeepsStableIdWhileAlive) {
@@ -236,16 +244,45 @@ TEST(TrackManagerTest, KeepsStableIdWhileAlive) {
   measurement.truthId = 24;
   measurements.measurements.push_back(measurement);
 
-  manager.update(measurements);
-  ASSERT_EQ(manager.tracks().size(), 1u);
-  const int id = manager.tracks().front().id;
+  for (int i = 0; i < 3; ++i) {
+    measurement.time = 1.0 + static_cast<double>(i);
+    measurements.measurements[0] = measurement;
+    manager.update(measurements);
+  }
 
-  measurement.time = 2.0;
+  ASSERT_EQ(manager.confirmedTracks().size(), 1u);
+  const int id = manager.confirmedTracks().front().id;
+
+  measurement.time = 5.0;
   measurements.measurements[0] = measurement;
   manager.update(measurements);
 
-  ASSERT_EQ(manager.tracks().size(), 1u);
-  EXPECT_EQ(manager.tracks().front().id, id);
+  ASSERT_EQ(manager.confirmedTracks().size(), 1u);
+  EXPECT_EQ(manager.confirmedTracks().front().id, id);
+}
+
+TEST(TrackManagerTest, ConfirmedTracksRequireThreeHits) {
+  TrackManager manager;
+  MeasurementSet_t measurements;
+  Measurement_t measurement;
+  measurement.value = Eigen::Vector2d(0.0, 0.0);
+  measurement.truthId = 8;
+  measurement.time = 12.0;
+  measurements.measurements.push_back(measurement);
+
+  manager.update(measurements);
+  EXPECT_TRUE(manager.confirmedTracks().empty());
+
+  measurement.time = 13.0;
+  measurements.measurements[0] = measurement;
+  manager.update(measurements);
+  EXPECT_TRUE(manager.confirmedTracks().empty());
+
+  measurement.time = 14.0;
+  measurements.measurements[0] = measurement;
+  manager.update(measurements);
+  ASSERT_EQ(manager.confirmedTracks().size(), 1u);
+  EXPECT_EQ(manager.confirmedTracks().front().status, TrackStatus::Confirmed);
 }
 
 TEST(PerformanceEvaluatorTest, MetricsCompute) {

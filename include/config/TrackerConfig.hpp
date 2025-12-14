@@ -50,6 +50,7 @@ public:
   std::vector<TargetDescriptor> targets;
   FilterFamily filterFamily = FilterFamily::PHD;
   RepresentationType representation = RepresentationType::GaussianMixture;
+  bool loggerVerbose = true;
 
 private:
   static SensorType sensorTypeFromString(const std::string &value);

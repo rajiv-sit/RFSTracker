@@ -1,10 +1,14 @@
+#include "association/AssociationLogger.hpp"
 #include "filters/CphdFilter.hpp"
+#include "filters/FilterLogger.hpp"
 #include "filters/GlmbFilter.hpp"
 #include "filters/MbFilter.hpp"
 #include "filters/PhdFilter.hpp"
+#include "logging/LoggerControl.hpp"
 #include "pipeline/TrackingPipeline.hpp"
 #include "representations/RepresentationFactory.hpp"
 #include "representations/RepresentationLogger.hpp"
+#include "track/TrackLogger.hpp"
 
 #include <Eigen/Dense>
 #include <fstream>
@@ -16,6 +20,9 @@ namespace rfs {
 
 namespace {
 void logPipeline(const std::string &message) {
+  if (!loggerVerboseEnabled()) {
+    return;
+  }
   std::ofstream log("rfs_app_debug.log", std::ios::app);
   log << message << std::endl;
 }
@@ -67,13 +74,17 @@ void TrackingPipeline::step(double dt) {
   simulation_.step(currentTime_, dt, measurementSet_);
   logPipeline("pipeline: simulation step complete");
   if (filter_) {
+    setFilterScanId(scanId_);
     filter_->predict(dt);
     logPipeline("pipeline: filter predict complete");
+    setFilterScanId(scanId_);
     filter_->update(measurementSet_);
     logPipeline("pipeline: filter update complete");
   }
 
   logPipeline("pipeline: track update start");
+  setTrackScanId(scanId_);
+  setAssociationScanId(scanId_);
   const auto &truthTargets = simulation_.truthStates();
   std::vector<bool> truthAssigned(truthTargets.size(), false);
   MeasurementSet_t estimateMeasurements;

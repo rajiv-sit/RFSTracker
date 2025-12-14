@@ -8,6 +8,8 @@ namespace rfs {
 class PhdFilter : public RepresentationFilter {
 public:
   explicit PhdFilter(std::unique_ptr<IRepresentation> representation);
+  void predict(double dt) override;
+  void update(const MeasurementSet_t &measurements) override;
 };
 
 } // namespace rfs

@@ -20,6 +20,8 @@ struct VisualizerOptions {
   bool showMeasurements = true;
   bool showTracks = true;
   bool showTrackDetails = true;
+  bool showTruthDetails = true;
+  bool showTrackTruthComparison = false;
 };
 
 /** @brief Runtime polymorphic visualizer contract. */

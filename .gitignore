@@ -12,6 +12,10 @@ CMakeUserPresets.json
 rfs_app.log
 rfs_app_debug.log
 representation_debug.log
+track_manager_debug.log
+filter_debug.log
+association_debug.log
+*.log
 
 # Generated binaries
 *.exe

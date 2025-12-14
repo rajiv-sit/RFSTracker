@@ -7,6 +7,7 @@
   "clutterRate": 0.0,
   "snrDb": 0.0,
   "enableVisualization": true,
+  "logger_verbose": true,
   "filterFamily": "PHD",
   "representation": "GaussianMixture", 
   "sensors": [
@@ -24,9 +25,72 @@
     {
       "id": 1,
       "startTime": 0.0,
-      "endTime": 3000.0,
-      "initialState": [100.0, 100.0, 1.5, 0.0],
-      "maneuverInterval": 600.0
+      "endTime": 30.0,
+      "initialState": [1000.0, 1000.0, 10.0, 0.0],
+      "maneuverInterval": 6.0
+    },
+    {
+      "id": 2,
+      "startTime": 5.0,
+      "endTime": 40.0,
+      "initialState": [2000.0, -500.0, -8.0, 2.0],
+      "maneuverInterval": 8.0
+    },
+    {
+      "id": 3,
+      "startTime": 10.0,
+      "endTime": 120.0,
+      "initialState": [-1500.0, 1200.0, 12.0, -3.0],
+      "maneuverInterval": 4.0
+    },
+    {
+      "id": 4,
+      "startTime": 20.0,
+      "endTime": 250.0,
+      "initialState": [2300.0, 800.0, -9.0, -2.5],
+      "maneuverInterval": 10.0
+    },
+    {
+      "id": 5,
+      "startTime": 50.0,
+      "endTime": 500.0,
+      "initialState": [0.0, -2000.0, -6.0, 6.0],
+      "maneuverInterval": 7.0
+    },
+    {
+      "id": 6,
+      "startTime": 150.0,
+      "endTime": 900.0,
+      "initialState": [-2200.0, -1200.0, 8.0, 1.5],
+      "maneuverInterval": 9.0
+    },
+    {
+      "id": 7,
+      "startTime": 400.0,
+      "endTime": 2000.0,
+      "initialState": [1500.0, -1500.0, -5.5, 5.0],
+      "maneuverInterval": 6.5
+    },
+    {
+      "id": 8,
+      "startTime": 800.0,
+      "endTime": 3200.0,
+      "initialState": [-800.0, 2200.0, 4.0, -6.0],
+      "maneuverInterval": 11.0
+    },
+    {
+      "id": 9,
+      "startTime": 1200.0,
+      "endTime": 5000.0,
+      "initialState": [100.0, -100.0, 2.5, -3.5],
+      "maneuverInterval": 5.0
+    },
+    {
+      "id": 10,
+      "startTime": 1600.0,
+      "endTime": 7200.0,
+      "initialState": [2500.0, 2200.0, -8.0, -4.0],
+      "maneuverInterval": 12.0
     }
   ]
 }
