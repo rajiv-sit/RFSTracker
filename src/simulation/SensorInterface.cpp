@@ -39,6 +39,9 @@ void RadarSensor::sense(double time, const std::vector<TargetState_t> &truth,
 }
 
 void RadarSensor::addClutter(double time, MeasurementSet_t &out) const {
+  if (config_.falseAlarmRate <= 0.0) {
+    return;
+  }
   std::poisson_distribution<int> clutterCount(config_.falseAlarmRate);
   std::uniform_real_distribution<double> distX(-config_.range, config_.range);
   std::uniform_real_distribution<double> distY(-config_.range, config_.range);

@@ -4,8 +4,12 @@
 #include "filters/PhdFilter.hpp"
 #include "pipeline/TrackingPipeline.hpp"
 #include "representations/RepresentationFactory.hpp"
+#include "representations/RepresentationLogger.hpp"
 
+#include <Eigen/Dense>
 #include <fstream>
+#include <limits>
+#include <optional>
 #include <utility>
 
 namespace rfs {
@@ -14,6 +18,32 @@ namespace {
 void logPipeline(const std::string &message) {
   std::ofstream log("rfs_app_debug.log", std::ios::app);
   log << message << std::endl;
+}
+
+constexpr double kTruthMatchThreshold = 40.0;
+
+std::optional<size_t> matchTruthTarget(const Eigen::Vector2d &position,
+                                       const std::vector<TargetState_t> &truthTargets,
+                                       std::vector<bool> &assigned) {
+  std::optional<size_t> bestIndex;
+  double bestDistance = std::numeric_limits<double>::max();
+
+  for (size_t i = 0; i < truthTargets.size(); ++i) {
+    if (assigned[i]) {
+      continue;
+    }
+    const double distance = (truthTargets[i].state.head<2>() - position).norm();
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = i;
+    }
+  }
+
+  if (bestIndex && bestDistance <= kTruthMatchThreshold) {
+    assigned[*bestIndex] = true;
+    return bestIndex;
+  }
+  return std::nullopt;
 }
 } // namespace
 
@@ -33,6 +63,7 @@ TrackingPipeline::~TrackingPipeline() {
 
 void TrackingPipeline::step(double dt) {
   logPipeline("pipeline: step start");
+  setRepresentationScanId(scanId_);
   simulation_.step(currentTime_, dt, measurementSet_);
   logPipeline("pipeline: simulation step complete");
   if (filter_) {
@@ -43,7 +74,24 @@ void TrackingPipeline::step(double dt) {
   }
 
   logPipeline("pipeline: track update start");
-  trackManager_.update(measurementSet_);
+  const auto &truthTargets = simulation_.truthStates();
+  std::vector<bool> truthAssigned(truthTargets.size(), false);
+  MeasurementSet_t estimateMeasurements;
+  if (filter_) {
+    const auto estimatorOutput = filter_->estimate();
+    estimateMeasurements.measurements.reserve(estimatorOutput.tracks.size());
+    for (const auto &state : estimatorOutput.tracks) {
+      Measurement_t measurement;
+      measurement.value = state.head<2>();
+      measurement.time = currentTime_;
+      if (const auto matched = matchTruthTarget(measurement.value, truthTargets, truthAssigned);
+          matched) {
+        measurement.truthId = truthTargets[*matched].id;
+      }
+      estimateMeasurements.measurements.push_back(measurement);
+    }
+  }
+  trackManager_.update(estimateMeasurements);
   logPipeline("pipeline: track update complete");
 
   const auto estimates = buildEstimates();
@@ -57,7 +105,7 @@ void TrackingPipeline::step(double dt) {
 
   if (visualizer_) {
     PerformanceMetrics metrics{rmse, nees, ospa};
-    visualizer_->renderFrame(measurementSet_, trackManager_.tracks(), simulation_.truthStates(),
+    visualizer_->renderFrame(measurementSet_, trackManager_.confirmedTracks(), simulation_.truthStates(),
                              metrics, scanId_ + 1, currentTime_);
     logPipeline("pipeline: render frame");
   }
@@ -95,9 +143,10 @@ void TrackingPipeline::instantiateFilter() {
 
 std::vector<TrackEstimate_t> TrackingPipeline::buildEstimates() const {
   std::vector<TrackEstimate_t> result;
-  result.reserve(trackManager_.tracks().size());
+  const auto &confirmedTracks = trackManager_.confirmedTracks();
+  result.reserve(confirmedTracks.size());
 
-  for (const auto &track : trackManager_.tracks()) {
+  for (const auto &track : confirmedTracks) {
     TrackEstimate_t estimate;
     estimate.state << track.position.x(), track.position.y(), 0.0, 0.0;
     result.push_back(estimate);
