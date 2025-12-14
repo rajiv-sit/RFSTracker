@@ -93,6 +93,32 @@ std::string loadShaderSource(const std::filesystem::path &path) {
   return std::string(std::istreambuf_iterator<char>(file),
                      std::istreambuf_iterator<char>());
 }
+
+const char *filterFamilyLabel(FilterFamily family) {
+  switch (family) {
+  case FilterFamily::CPHD:
+    return "CPHD";
+  case FilterFamily::MB:
+    return "MB";
+  case FilterFamily::GLMB:
+    return "GLMB";
+  case FilterFamily::PHD:
+  default:
+    return "PHD";
+  }
+}
+
+const char *representationLabel(RepresentationType type) {
+  switch (type) {
+  case RepresentationType::Particle:
+    return "Particles";
+  case RepresentationType::Spline:
+    return "Spline";
+  case RepresentationType::GaussianMixture:
+  default:
+    return "GaussianMixture";
+  }
+}
 } // namespace
 
 ImGuiVisualizer::ImGuiVisualizer(std::shared_ptr<TrackerConfig> config)
@@ -321,6 +347,8 @@ void ImGuiVisualizer::showControlPanels(const MeasurementSet_t &measurements,
   ImGui::Text("Truth targets: %zu", truth.size());
   ImGui::Text("Measurements: %zu", measurements.measurements.size());
   ImGui::Text("Tracks alive: %zu", tracks.size());
+  ImGui::Text("Filter family: %s", filterFamilyLabel(config_->filterFamily));
+  ImGui::Text("Representation: %s", representationLabel(config_->representation));
   ImGui::Spacing();
   ImGui::Text("Display");
   ImGui::Checkbox("Show Truth", &options_.showTruth);

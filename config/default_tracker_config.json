@@ -8,7 +8,7 @@
   "snrDb": 20.0,
   "enableVisualization": true,
   "filterFamily": "PHD",
-  "representation": "Spline", 
+  "representation": "GaussianMixture", 
   "sensors": [
     {
       "type": "Radar",
