@@ -54,9 +54,9 @@ RFSTracker is a Windows-based multi-target tracking prototype that simulates a 5
 
 ## Tests & Validation
 
-- After building, run `build_debug\Debug\rfs_unit_tests.exe` to exercise GoogleTest suites covering config parsing, numerics, representation backends, Hungarian assignment, track management, and performance metrics. The output should report `[==========] 10 tests from 9 test suites ran. ... [  PASSED  ] 10 tests.`
-- Running `build_debug.bat` also confirms the GUI path (Conan/CMake → rfs_app → closing GLFW window), so running that script is the primary validation path before pushing.
-- Logs: `rfs_app_debug.log` captures pipeline step markers and initialization errors while debugging (sensor/GUI issues).
+- `./build_debug.bat` replays the full Debug workflow (Conan install, CMake configure/build, and it launches `rfs_app.exe`; close the GUI window to finish). It also creates `build_debug/Debug/filter_debug.log`, `association_debug.log`, `track_manager_debug.log`, and `rfs_app_debug.log` locally (all ignored via `.gitignore`), which are handy for tracing per-scan predictions/assignments when `logger_verbose` is `true`.
+- Run `build_debug\Debug\rfs_unit_tests.exe` to validate config parsing, numerics, representations, Hungarian assignment, track management, and performance metrics; expect `[  PASSED  ] 10 tests.` in the output before pushing.
+- Whenever you change clutter, detection, or SNR parameters, rerun both the GUI (`build_debug.bat`) and the unit tests so the logs keep showing one confirmed track per moving target and no ghost IDs linger.
 
 ## Architecture & Documentation
 

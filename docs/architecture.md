@@ -105,6 +105,7 @@ The `TrackingPipeline` loops through these steps:
 
 ## 12. Validation & Logs
 
-- Running `build_debug.bat` (which internally calls `conan install`, configures CMake, builds, and launches `rfs_app.exe`) is the easiest way to validate the Debug flow. Closing the GUI window ends the script and confirms GLFW/ImGui integration works with the local bindings and shaders.
-- `build_debug/Debug/rfs_unit_tests.exe` exercises configuration parsing, numerics, representations, association, tracking, and performance metrics—ensure it reports `[  PASSED  ] 10 tests.` before pushing.
-- All per-run logging happens via `rfs_app_debug.log` while debugging; it records pipeline step boundaries and any initialization errors, which helps trace GUI failures or shader issues in headless audits.
+- Running `build_debug.bat` replays the Debug workflow (Conan install, CMake configure/build, and `rfs_app.exe` launch). The script drops into `build_debug\Debug`, so closing the GUI window is required to let the batch file finish; this also proves the ImGui + GLSL bindings continue to work with the local shader sources.
+- With `TrackerConfig::logger_verbose` enabled, the app generates per-component log files next to the executable (`filter_debug.log`, `association_debug.log`, `track_manager_debug.log`, `representation_debug.log`, `rfs_app_debug.log`, etc.). These logs record scan IDs, prediction/update/association actions, and track lifecycle decisions and are already ignored via `.gitignore`, so they can be re-created freely when you need to trace a regression.
+- `build_debug\Debug\rfs_unit_tests.exe` runs the GoogleTest suites for config parsing, numerics, representations, Hungarian assignment, track management, and performance metrics — expect `[  PASSED  ] 10 tests.` before pushing changes.
+- Whenever you tweak clutter, detection, or SNR parameters (or any state-dependent sensor settings), rerun both `build_debug.bat` (to regen the logs and GUI visuals) and the unit tests so the logs keep showing one confirmed track per moving target and no phantom IDs linger, and so the test suite still passes in the new noise regime.
