@@ -181,6 +181,30 @@ TEST(TrackManagerTest, CreatesTracksFromMeasurements) {
   EXPECT_EQ(manager.tracks().size(), 2u);
 }
 
+TEST(TrackManagerTest, ReusesIdsForTruthTargets) {
+  TrackManager manager;
+  MeasurementSet_t measurements;
+  Measurement_t measurement;
+  measurement.value = Eigen::Vector2d(1.0, 2.0);
+  measurement.time = 1.0;
+  measurement.truthId = 42;
+  measurements.measurements.push_back(measurement);
+
+  manager.update(measurements);
+  ASSERT_EQ(manager.tracks().size(), 1u);
+  const int initialId = manager.tracks().front().id;
+
+  for (int i = 0; i < 4; ++i) {
+    manager.update(MeasurementSet_t{});
+  }
+
+  measurement.time = 2.0;
+  measurements.measurements[0] = measurement;
+  manager.update(measurements);
+  ASSERT_EQ(manager.tracks().size(), 1u);
+  EXPECT_EQ(manager.tracks().front().id, initialId);
+}
+
 TEST(PerformanceEvaluatorTest, MetricsCompute) {
   PerformanceEvaluator evaluator;
   std::vector<TrackEstimate_t> estimates(2);

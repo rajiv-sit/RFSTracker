@@ -5,6 +5,8 @@
 #include "simulation/TargetState.hpp"
 
 #include <Eigen/Dense>
+#include <optional>
+#include <unordered_map>
 #include <vector>
 
 namespace rfs {
@@ -19,6 +21,7 @@ struct TrackState {
   int misses = 0;
   double lastUpdateTime = 0.0;
   TrackStatus status = TrackStatus::Newborn;
+  std::optional<int> truthId;
 };
 
 /** @brief Manages track lifecycle using assignment. */
@@ -31,10 +34,13 @@ public:
 
 private:
   TrackStatus statusForHits(int hits) const;
+  std::optional<int> canonicalTrackId(int truthId) const;
+  int allocateTrackIdForTruth(int truthId);
 
   std::vector<TrackState> tracks_;
   int nextId_ = 0;
   HungarianSolver solver_;
+  std::unordered_map<int, int> truthIdToTrackId_;
 };
 
 } // namespace rfs

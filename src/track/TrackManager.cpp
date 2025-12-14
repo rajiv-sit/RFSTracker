@@ -19,14 +19,42 @@ void TrackManager::update(const MeasurementSet_t &measurements) {
     return;
   }
 
+  const auto createTrackId = [this](const std::optional<int> &truthId) {
+    if (!truthId.has_value()) {
+      return nextId_++;
+    }
+    const int truthIndex = *truthId;
+    if (const auto existing = canonicalTrackId(truthIndex); existing.has_value()) {
+      return *existing;
+    }
+    return allocateTrackIdForTruth(truthIndex);
+  };
+
+  const auto bindTruthIdToTrack =
+      [this](TrackState &track, const std::optional<int> &truthId) {
+        if (!truthId.has_value()) {
+          return;
+        }
+        const int truthIndex = *truthId;
+        if (const auto existing = canonicalTrackId(truthIndex); existing.has_value()) {
+          track.id = *existing;
+        } else if (track.id < 0) {
+          track.id = allocateTrackIdForTruth(truthIndex);
+        } else {
+          truthIdToTrackId_.emplace(truthIndex, track.id);
+        }
+        track.truthId = truthId;
+      };
+
   if (tracks_.empty()) {
     for (const auto &measurement : measurementList) {
       TrackState track;
-      track.id = nextId_++;
+      track.id = createTrackId(measurement.truthId);
       track.position = measurement.value;
       track.hits = 1;
       track.lastUpdateTime = measurement.time;
       track.status = TrackStatus::Newborn;
+      bindTruthIdToTrack(track, measurement.truthId);
       tracks_.push_back(track);
     }
     return;
@@ -59,13 +87,14 @@ void TrackManager::update(const MeasurementSet_t &measurements) {
       if (deltaTime > 1e-6) {
         track.velocity = (measurement.value - previousPosition) / deltaTime;
       } else if (track.hits == 0) {
-        track.velocity = Eigen::Vector2d::Zero();
+      track.velocity = Eigen::Vector2d::Zero();
       }
 
       track.hits += 1;
       track.misses = 0;
       track.lastUpdateTime = measurement.time;
       track.status = statusForHits(track.hits);
+      bindTruthIdToTrack(track, measurement.truthId);
       measurementAssigned[assignment.assignment[i]] = true;
     } else {
       track.misses += 1;
@@ -75,11 +104,12 @@ void TrackManager::update(const MeasurementSet_t &measurements) {
   for (size_t j = 0; j < measurementCount; ++j) {
     if (!measurementAssigned[j]) {
       TrackState newTrack;
-      newTrack.id = nextId_++;
+      newTrack.id = createTrackId(measurementList[j].truthId);
       newTrack.position = measurementList[j].value;
       newTrack.hits = 1;
       newTrack.lastUpdateTime = measurementList[j].time;
       newTrack.status = TrackStatus::Newborn;
+      bindTruthIdToTrack(newTrack, measurementList[j].truthId);
       tracks_.push_back(newTrack);
     }
   }
@@ -101,6 +131,20 @@ TrackStatus TrackManager::statusForHits(int hits) const {
     return TrackStatus::Tentative;
   }
   return TrackStatus::Confirmed;
+}
+
+std::optional<int> TrackManager::canonicalTrackId(int truthId) const {
+  const auto it = truthIdToTrackId_.find(truthId);
+  if (it == truthIdToTrackId_.end()) {
+    return std::nullopt;
+  }
+  return it->second;
+}
+
+int TrackManager::allocateTrackIdForTruth(int truthId) {
+  const int id = nextId_++;
+  truthIdToTrackId_[truthId] = id;
+  return id;
 }
 
 } // namespace rfs
