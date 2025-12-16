@@ -36,6 +36,7 @@ RFSTracker/
 - `TrackerConfig` centralizes every runtime parameter: sampling time, number of scans, spatial area, clutter/SNR budgets, visualization enable flag, the sensor list, the target descriptors, the selected `FilterFamily`, and the representation backend.
 - Sensors are defined via `SensorConfig`. The radar sensor carries detection probability, false alarm rate, range, azimuth/range standard deviations, and signal-to-noise ratio. Adjusting these values simulates different sensor fidelity or clutter environments.
 - Targets appear only while the current time is within `[startTime, endTime]`. The user can configure start/end times independently per target, so the scene can gracefully add or remove tracks at any point in the run. `maxTargets` caps simultaneous identities to avoid overload.
+- When `representation` is `Particles`, set `core_particle_type` to `SIS`, `SIR`, `APF`, or `RPF` to select the bootstrap, auxiliary, or regularized weighting/resampling strategy; omitting the field defaults to SIR.
 
 ## 4. Truth Generation & Measurements
 
@@ -74,7 +75,7 @@ The `TrackingPipeline` loops through these steps:
   * Initializes GLFW (OpenGL 3.3 core profile), GLAD, and ImGui using the local `bindings/imgui_impl_glfw.*` and `bindings/imgui_impl_opengl3.*` sources to keep the backend code synchronized with the configured `imgui/cci.20230105+1.89.2.docking` package.
   * Compiles vertex/fragment shaders from the `shaders/` directory (`grid.vs`, `grid.fs`) and prepares grid vertex buffers plus point buffers for measurements, truths, and tracks.
   * Maintains historical traces of RMSE, NEES, and OSPA (capped at ~256 samples) and renders them with ImGui’s `PlotLines`.
-  * Displays a control panel that shows scan ID, elapsed time, and counts for truth, measurement, and track objects. Toggle controls allow the user to show/hide truth, measurements, and track overlays; a dedicated button opens/closes the track-detail overlay.
+  * Displays a control panel that shows scan ID, elapsed time, truth/measurement/track counts, the `filterFamily`/`representation`, and — when `representation` is `Particles` — the configured `core_particle_type` (SIS/SIR/APF/RPF). Toggle controls allow the user to show/hide truth, measurements, and track overlays, and a dedicated button opens/closes the track-detail overlay.
   * The overlay lists every track’s ID, status, position, velocity, hits, and misses for the current scan.
   * Draws truth points (green), measurements (blue), newborn tracks (yellow), tentative tracks (pink), and confirmed tracks (red) with a shared shader-driven point renderer. The point size and colors are configurable via new Visualizer options if needed.
   * Exposes performance metrics (textual values plus sparklines) for NEES, RMSE, and OSPA on every frame.
