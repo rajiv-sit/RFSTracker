@@ -89,6 +89,7 @@ private:
   std::vector<float> rmseHistory_;
   std::vector<float> neesHistory_;
   std::vector<float> ospaHistory_;
+  std::vector<float> trackSpreadHistory_;
   float areaHalfWidth_ = 0.0f;
   float areaHalfHeight_ = 0.0f;
   std::filesystem::path shaderDirectory_;

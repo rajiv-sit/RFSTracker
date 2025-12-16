@@ -274,13 +274,20 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
     return;
   }
 
-  rmseHistory_.push_back(static_cast<float>(metrics.rmse));
-  neesHistory_.push_back(static_cast<float>(metrics.nees));
-  ospaHistory_.push_back(static_cast<float>(metrics.ospa));
-  if (rmseHistory_.size() > 256) {
-    rmseHistory_.erase(rmseHistory_.begin());
-    neesHistory_.erase(neesHistory_.begin());
-    ospaHistory_.erase(ospaHistory_.begin());
+  if (metrics.truthAvailable) {
+    rmseHistory_.push_back(static_cast<float>(metrics.rmse));
+    neesHistory_.push_back(static_cast<float>(metrics.nees));
+    ospaHistory_.push_back(static_cast<float>(metrics.ospa));
+    if (rmseHistory_.size() > 256) {
+      rmseHistory_.erase(rmseHistory_.begin());
+      neesHistory_.erase(neesHistory_.begin());
+      ospaHistory_.erase(ospaHistory_.begin());
+    }
+  } else {
+    trackSpreadHistory_.push_back(static_cast<float>(metrics.trackSpread));
+    if (trackSpreadHistory_.size() > 256) {
+      trackSpreadHistory_.erase(trackSpreadHistory_.begin());
+    }
   }
 
   ImGui_ImplOpenGL3_NewFrame();
@@ -404,20 +411,30 @@ void ImGuiVisualizer::showMetricsWindow(const MeasurementSet_t &measurements,
   ImGui::Text("Truth targets: %zu", truth.size());
   ImGui::Text("Tracks: %zu", tracks.size());
   ImGui::Separator();
-  ImGui::Text("RMSE: %.2f", metrics.rmse);
-  ImGui::Text("NEES: %.2f", metrics.nees);
-  ImGui::Text("OSPA: %.2f", metrics.ospa);
-  if (!rmseHistory_.empty()) {
-    ImGui::PlotLines("RMSE", rmseHistory_.data(), static_cast<int>(rmseHistory_.size()), 0,
-                     nullptr, FLT_MAX, FLT_MAX, ImVec2(0, 60));
-  }
-  if (!neesHistory_.empty()) {
-    ImGui::PlotLines("NEES", neesHistory_.data(), static_cast<int>(neesHistory_.size()), 0,
-                     nullptr, FLT_MAX, FLT_MAX, ImVec2(0, 60));
-  }
-  if (!ospaHistory_.empty()) {
-    ImGui::PlotLines("OSPA", ospaHistory_.data(), static_cast<int>(ospaHistory_.size()), 0,
-                     nullptr, FLT_MAX, FLT_MAX, ImVec2(0, 60));
+  if (metrics.truthAvailable) {
+    ImGui::Text("RMSE: %.2f", metrics.rmse);
+    ImGui::Text("NEES: %.2f", metrics.nees);
+    ImGui::Text("OSPA: %.2f", metrics.ospa);
+    if (!rmseHistory_.empty()) {
+      ImGui::PlotLines("RMSE", rmseHistory_.data(), static_cast<int>(rmseHistory_.size()), 0,
+                       nullptr, FLT_MAX, FLT_MAX, ImVec2(0, 60));
+    }
+    if (!neesHistory_.empty()) {
+      ImGui::PlotLines("NEES", neesHistory_.data(), static_cast<int>(neesHistory_.size()), 0,
+                       nullptr, FLT_MAX, FLT_MAX, ImVec2(0, 60));
+    }
+    if (!ospaHistory_.empty()) {
+      ImGui::PlotLines("OSPA", ospaHistory_.data(), static_cast<int>(ospaHistory_.size()), 0,
+                       nullptr, FLT_MAX, FLT_MAX, ImVec2(0, 60));
+    }
+  } else {
+    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.0f, 1.0f), "Truth data unavailable!");
+    ImGui::Text("Track spread (avg. pairwise distance): %.2f m", metrics.trackSpread);
+    if (!trackSpreadHistory_.empty()) {
+      ImGui::PlotLines("Track Spread", trackSpreadHistory_.data(),
+                       static_cast<int>(trackSpreadHistory_.size()), 0, nullptr,
+                       FLT_MAX, FLT_MAX, ImVec2(0, 60));
+    }
   }
   ImGui::Spacing();
   if (options_.showTrackDetails) {

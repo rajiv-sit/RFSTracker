@@ -88,6 +88,7 @@ The `TrackingPipeline` loops through these steps:
   * **NEES** – normalized squared error averaged over the first four components of the state.
   * **RMSE** – Euclidean root-mean-square of the 2D position estimate errors.
   * **OSPA** – OSPA distance with a 50 m cutoff, so unmatched tracks incur a fixed penalty.
+- When the run has no ground-truth targets (real radar data or headless mode), `PerformanceMetrics::truthAvailable` flips to `false`, the truth-based averages are skipped, and the pipeline instead reports the average pairwise track spread so the GUI can still surface a health signal without NEES/RMSE/OSPA.
 - The computed metrics are fed to the visualizer for rendering and to future logging or evaluation hooks.
 
 ## 10. Builds & Tests

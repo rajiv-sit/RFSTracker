@@ -53,6 +53,27 @@ std::optional<size_t> matchTruthTarget(const Eigen::Vector2d &position,
   }
   return std::nullopt;
 }
+
+double computeTrackSpread(const std::vector<TrackState> &tracks) {
+  const size_t count = tracks.size();
+  if (count < 2) {
+    return 0.0;
+  }
+
+  double totalDistance = 0.0;
+  size_t pairCount = 0;
+  for (size_t i = 0; i < count; ++i) {
+    for (size_t j = i + 1; j < count; ++j) {
+      totalDistance += (tracks[i].position - tracks[j].position).norm();
+      ++pairCount;
+    }
+  }
+
+  if (pairCount == 0) {
+    return 0.0;
+  }
+  return totalDistance / static_cast<double>(pairCount);
+}
 } // namespace
 
 TrackingPipeline::TrackingPipeline(std::shared_ptr<TrackerConfig> config,
@@ -132,13 +153,18 @@ void TrackingPipeline::step(double dt) {
   const auto truth = buildTruth();
   logPipeline("pipeline: estimates/truth built");
 
-  const double nees = performance_.computeNEES(estimates, truth);
-  const double rmse = performance_.computeRMSE(estimates, truth);
-  const double ospa = performance_.computeOSPA(estimates, truth);
+  PerformanceMetrics metrics;
+  metrics.truthAvailable = !truth.empty();
+  if (metrics.truthAvailable) {
+    metrics.nees = performance_.computeNEES(estimates, truth);
+    metrics.rmse = performance_.computeRMSE(estimates, truth);
+    metrics.ospa = performance_.computeOSPA(estimates, truth);
+  } else {
+    metrics.trackSpread = computeTrackSpread(trackManager_.confirmedTracks());
+  }
   logPipeline("pipeline: metrics computed");
 
   if (visualizer_) {
-    PerformanceMetrics metrics{rmse, nees, ospa};
     visualizer_->renderFrame(measurementSet_, trackManager_.confirmedTracks(), simulation_.truthStates(),
                              metrics, scanId_ + 1, currentTime_);
     logPipeline("pipeline: render frame");

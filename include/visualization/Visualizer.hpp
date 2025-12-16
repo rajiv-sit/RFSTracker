@@ -12,6 +12,8 @@ struct PerformanceMetrics {
   double rmse = 0.0;
   double nees = 0.0;
   double ospa = 0.0;
+  double trackSpread = 0.0;
+  bool truthAvailable = true;
   // Future metrics (NIS, OSPA2, etc.) can be added here.
 };
 
