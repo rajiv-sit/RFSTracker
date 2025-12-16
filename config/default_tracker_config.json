@@ -9,8 +9,7 @@
   "enableVisualization": true,
   "logger_verbose": true,
   "filterFamily": "PHD",
-  "representation": "Particles",
-  "core_particle_type": "RPF",
+  "representation": "Spline",
   "sensors": [
     {
       "type": "Radar",

@@ -5,7 +5,8 @@
 #include <datatable.h>
 
 #include <algorithm>
-#include <iostream>
+#include <cmath>
+#include <optional>
 
 namespace rfs {
 
@@ -17,7 +18,12 @@ void SplineRepresentation::update(const MeasurementSet_t &measurements) {
   std::map<double, Eigen::Vector2d> accumulated;
   std::map<double, size_t> counts;
   for (const auto &measurement : measurements.measurements) {
-    accumulated[measurement.time] += measurement.value;
+    auto &sum = accumulated[measurement.time];
+    if (counts[measurement.time] == 0) {
+      sum = measurement.value;
+    } else {
+      sum += measurement.value;
+    }
     ++counts[measurement.time];
   }
   for (const auto &[time, sum] : accumulated) {
@@ -50,42 +56,66 @@ void SplineRepresentation::update(const MeasurementSet_t &measurements) {
 
 std::vector<Eigen::Vector4d> SplineRepresentation::estimate() const {
   std::vector<Eigen::Vector4d> states;
-  std::cerr << "SplineRepresentation::estimate history=" << measurementHistory_.size()
-            << " bsplineX=" << static_cast<bool>(bsplineX_)
-            << " bsplineY=" << static_cast<bool>(bsplineY_)
-            << " evalTimes=" << evaluationTimes_.size() << "\n";
   if ((!bsplineX_ || !bsplineY_) && measurementHistory_.empty()) {
     return states;
   }
 
   if (!bsplineX_ || !bsplineY_ || evaluationTimes_.empty()) {
-    states.reserve(measurementHistory_.size());
-    for (const auto &[time, position] : measurementHistory_) {
-      Eigen::Vector4d state;
-      state[0] = position.x();
-      state[1] = position.y();
-      state[2] = 0.0;
-      state[3] = 0.0;
-      states.push_back(state);
+    if (measurementHistory_.empty()) {
+      return states;
     }
+    const auto &latest = measurementHistory_.rbegin();
+    Eigen::Vector4d state;
+    state[0] = latest->second.x();
+    state[1] = latest->second.y();
+    state[2] = 0.0;
+    state[3] = 0.0;
+    states.push_back(state);
     return states;
   }
 
-  states.reserve(evaluationTimes_.size());
-  for (double time : evaluationTimes_) {
+  const auto isCoordinateValid = [](double value) {
+    return std::isfinite(value) && std::abs(value) <= 1.0e6;
+  };
+  const auto fallbackState = [this]() -> std::optional<Eigen::Vector4d> {
+    if (measurementHistory_.empty()) {
+      return std::nullopt;
+    }
+    const auto &latest = measurementHistory_.rbegin();
+    Eigen::Vector4d fallback;
+    fallback[0] = latest->second.x();
+    fallback[1] = latest->second.y();
+    fallback[2] = 0.0;
+    fallback[3] = 0.0;
+    return fallback;
+  };
+
+  const double time = evaluationTimes_.back();
+  Eigen::Vector4d state;
+  bool valid = false;
+  if (bsplineX_ && bsplineY_) {
     SPLINTER::DenseVector input(1);
     input[0] = time;
     try {
-      Eigen::Vector4d state;
       state[0] = bsplineX_->eval(input);
       state[1] = bsplineY_->eval(input);
-      state[2] = 0.0;
-      state[3] = 0.0;
-      states.push_back(state);
+      valid = isCoordinateValid(state[0]) && isCoordinateValid(state[1]);
     } catch (const std::exception &) {
-      continue;
+      valid = false;
     }
   }
+
+  if (!valid) {
+    if (const auto fallback = fallbackState()) {
+      state = *fallback;
+    } else {
+      return states;
+    }
+  }
+
+  state[2] = 0.0;
+  state[3] = 0.0;
+  states.push_back(state);
 
   return states;
 }
