@@ -110,3 +110,52 @@ The `TrackingPipeline` loops through these steps:
 - With `TrackerConfig::logger_verbose` enabled, the app generates per-component log files next to the executable (`filter_debug.log`, `association_debug.log`, `track_manager_debug.log`, `representation_debug.log`, `rfs_app_debug.log`, etc.). These logs record scan IDs, prediction/update/association actions, and track lifecycle decisions and are already ignored via `.gitignore`, so they can be re-created freely when you need to trace a regression.
 - `build_debug\Debug\rfs_unit_tests.exe` runs the GoogleTest suites for config parsing, numerics, representations, Hungarian assignment, track management, and performance metrics — expect `[  PASSED  ] 10 tests.` before pushing changes.
 - Whenever you tweak clutter, detection, or SNR parameters (or any state-dependent sensor settings), rerun both `build_debug.bat` (to regen the logs and GUI visuals) and the unit tests so the logs keep showing one confirmed track per moving target and no phantom IDs linger, and so the test suite still passes in the new noise regime.
+
+## 13. Architecture Diagram & Design Patterns
+
+```
+                +---------------------+
+                |   TrackerConfig     |
+                +---------------------+
+                          |
+                          v
+       +--------------------------+      +---------------------+
+       | SimulationEnvironment    |----->|   Sensors (Radar)   |
+       | - GroundTruthGenerator   |      +---------------------+
+       | - SensorInterface list   |
+       +--------------------------+
+                          |
+                          v
+                +---------------------+
+                | TrackingPipeline    |
+                | - instantiateFilter |
+                +---------------------+
+                          |
+          +---------------+---------------+
+          |                               |
+          v                               v
+ +---------------------+         +---------------------+
+ | Representation      |<--------| RepresentationFactory|
+ | (Gaussian/Particle/ |         +---------------------+
+ |  Spline)            |
+ +---------------------+
+          |
+          v
+ +---------------------+
+ | TrackManager        |
+ +---------------------+
+          |
+          v
+ +---------------------+     +---------------------+
+ | PerformanceEvaluator|<----| Truth & Measurements|
+ +---------------------+     +---------------------+
+          |
+          v
+ +---------------------+
+ | Visualizer (ImGui)  |
+ | - Polymorphic iface |
+ +---------------------+
+ ```
+
+- **Diagram explanation:** `TrackerConfig` feeds the simulation/visualization knobs; `SimulationEnvironment` ticks the world and sensors, passes measurements to `TrackingPipeline`, which uses `RepresentationFactory` to instantiate the configured backend (Gaussian mixture, particle swarms, or spline builder). `TrackManager` maintains associations, while `PerformanceEvaluator` compares tracks to truth before the visualizer paints the scene with ImGui/GLFW.
+- **Design patterns:** The repo uses a *Factory* to create representations (`RepresentationFactory::createRepresentation()`), a *Strategy* (polymorphic `Visualizer` interface with `ImGuiVisualizer`) so rendering backends can be swapped, and a *Facade* (the `TrackingPipeline`) that hides the low-level simulation, filtering, and tracking details from `main`. Dependency inversion shows through the use of interfaces like `SensorInterface` and `Representation`, letting higher-level code depend on abstractions instead of concretes and easing future extensions.
