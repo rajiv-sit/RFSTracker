@@ -9,7 +9,7 @@
   "enableVisualization": true,
   "logger_verbose": true,
   "filterFamily": "CPHD",
-  "representation": "GaussianMixture",
+  "representation": "Spline",
   "sensors": [
     {
       "type": "Radar",
