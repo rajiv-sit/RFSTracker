@@ -121,6 +121,21 @@ const char *representationLabel(RepresentationType type) {
     return "GaussianMixture";
   }
 }
+
+const char *particleFilterTypeLabel(ParticleFilterType type) {
+  switch (type) {
+  case ParticleFilterType::SIS:
+    return "SIS";
+  case ParticleFilterType::SIR:
+    return "SIR";
+  case ParticleFilterType::APF:
+    return "APF";
+  case ParticleFilterType::RPF:
+    return "RPF";
+  default:
+    return "Unknown";
+  }
+}
 } // namespace
 
 ImGuiVisualizer::ImGuiVisualizer(std::shared_ptr<TrackerConfig> config)
@@ -353,6 +368,10 @@ void ImGuiVisualizer::showControlPanels(const MeasurementSet_t &measurements,
   ImGui::Text("Tracks alive: %zu", tracks.size());
   ImGui::Text("Filter family: %s", filterFamilyLabel(config_->filterFamily));
   ImGui::Text("Representation: %s", representationLabel(config_->representation));
+  if (config_->representation == RepresentationType::Particle) {
+    ImGui::Text("Core particle type: %s",
+                particleFilterTypeLabel(config_->coreParticleType));
+  }
   ImGui::Spacing();
   ImGui::Text("Display");
   ImGui::Checkbox("Show Truth", &options_.showTruth);
