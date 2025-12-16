@@ -5,15 +5,18 @@
 #include "filters/MbFilter.hpp"
 #include "filters/PhdFilter.hpp"
 #include "logging/LoggerControl.hpp"
+#include "logging/TruthTrackLogger.hpp"
 #include "pipeline/TrackingPipeline.hpp"
 #include "representations/RepresentationFactory.hpp"
 #include "representations/RepresentationLogger.hpp"
+#include "simulation/TargetState.hpp"
 #include "track/TrackLogger.hpp"
 
 #include <Eigen/Dense>
 #include <fstream>
 #include <limits>
 #include <optional>
+#include <unordered_map>
 #include <utility>
 
 namespace rfs {
@@ -27,11 +30,9 @@ void logPipeline(const std::string &message) {
   log << message << std::endl;
 }
 
-constexpr double kTruthMatchThreshold = 40.0;
-
 std::optional<size_t> matchTruthTarget(const Eigen::Vector2d &position,
                                        const std::vector<TargetState_t> &truthTargets,
-                                       std::vector<bool> &assigned) {
+                                       std::vector<bool> &assigned, double threshold) {
   std::optional<size_t> bestIndex;
   double bestDistance = std::numeric_limits<double>::max();
 
@@ -46,7 +47,7 @@ std::optional<size_t> matchTruthTarget(const Eigen::Vector2d &position,
     }
   }
 
-  if (bestIndex && bestDistance <= kTruthMatchThreshold) {
+  if (bestIndex && bestDistance <= threshold) {
     assigned[*bestIndex] = true;
     return bestIndex;
   }
@@ -91,11 +92,15 @@ void TrackingPipeline::step(double dt) {
   if (filter_) {
     const auto estimatorOutput = filter_->estimate();
     estimateMeasurements.measurements.reserve(estimatorOutput.tracks.size());
+    const double truthMatchThreshold = (config_ && config_->truthMatchThreshold > 0.0)
+                                           ? config_->truthMatchThreshold
+                                           : std::numeric_limits<double>::max();
     for (const auto &state : estimatorOutput.tracks) {
       Measurement_t measurement;
       measurement.value = state.head<2>();
       measurement.time = currentTime_;
-      if (const auto matched = matchTruthTarget(measurement.value, truthTargets, truthAssigned);
+      if (const auto matched =
+              matchTruthTarget(measurement.value, truthTargets, truthAssigned, truthMatchThreshold);
           matched) {
         measurement.truthId = truthTargets[*matched].id;
       }
@@ -104,6 +109,24 @@ void TrackingPipeline::step(double dt) {
   }
   trackManager_.update(estimateMeasurements);
   logPipeline("pipeline: track update complete");
+
+  std::unordered_map<int, TargetState_t> truthById;
+  truthById.reserve(truthTargets.size());
+  for (const auto &target : truthTargets) {
+    truthById[target.id] = target;
+  }
+  for (const auto &track : trackManager_.tracks()) {
+    if (!track.truthId) {
+      continue;
+    }
+    const auto found = truthById.find(*track.truthId);
+    if (found == truthById.end()) {
+      continue;
+    }
+    const double distance =
+        (track.position - found->second.state.head<2>()).norm();
+    logTruthTrackComparison(scanId_, track, found->second, distance);
+  }
 
   const auto estimates = buildEstimates();
   const auto truth = buildTruth();
@@ -133,7 +156,7 @@ bool TrackingPipeline::shouldStop() const {
 void TrackingPipeline::instantiateFilter() {
   switch (config_->filterFamily) {
   case FilterFamily::CPHD: {
-    auto representation = createRepresentation(config_->representation);
+    auto representation = createRepresentation(config_->representation, config_.get());
     filter_ = std::make_unique<CphdFilter>(std::move(representation));
     break;
   }
@@ -145,7 +168,7 @@ void TrackingPipeline::instantiateFilter() {
     break;
   case FilterFamily::PHD:
   default: {
-    auto representation = createRepresentation(config_->representation);
+    auto representation = createRepresentation(config_->representation, config_.get());
     filter_ = std::make_unique<PhdFilter>(std::move(representation));
     break;
   }

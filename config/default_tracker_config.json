@@ -9,7 +9,8 @@
   "enableVisualization": true,
   "logger_verbose": true,
   "filterFamily": "PHD",
-  "representation": "GaussianMixture", 
+  "representation": "Particles",
+  "core_particle_type": "SIR",
   "sensors": [
     {
       "type": "Radar",

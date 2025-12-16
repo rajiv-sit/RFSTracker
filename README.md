@@ -30,7 +30,7 @@ RFSTracker is a Windows-based multi-target tracking prototype that simulates a 5
 ## Running the App
 
 - The GUI shows the scan ID, elapsed time, truth/measurement/track counts, and performance metrics for every scan.
-- Use the toggles to show/hide truth, measurement, and track overlays, and click “Show Track Details” to open the per-track table.
+- Use the toggles to show/hide truth, measurement, and track overlays, and click “Show Track Details” to open the per-track table. The Tracker Control panel also lists the active `filterFamily`/`representation`, and when `representation` is `Particles` it surfaces the configured `core_particle_type` (`SIS`, `SIR`, `APF`, `RPF`) so you can confirm which particle strategy the GUI is driving.
 - The control panel exposes NEES, RMSE, and OSPA alongside sparkline plots (256-sample history).
 - Visualizer colors:
   * Truth: green
@@ -49,6 +49,8 @@ RFSTracker is a Windows-based multi-target tracking prototype that simulates a 5
   * list `SensorConfig` entries (detection probability, false alarm rate, range, noise, SNR)
   * declare `TargetDescriptor`s with `id`, `startTime`, `endTime`, `initialState`, `maneuverInterval`
   * set `filterFamily` to `PHD`, `CPHD`, `MB`, or `GLMB` and `representation` to `GaussianMixture`, `Particles`, or `Spline`
+    * when `representation` is `Particles`, add `core_particle_type` (`SIS`, `SIR`, `APF`, `RPF`) to pick the underlying particle filter strategy; omitting it defaults to `SIR`
+    * optional `truthMatchThreshold` (meters) caps how far an estimate may drift from a truth state before the pipeline stops pairing them for logging/metrics; defaults to `80.0`
 
 - Run `rfs_app.exe custom_config.json` from `build_debug\Debug` / `build_release\Release` to override the default file.
 

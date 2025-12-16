@@ -6,6 +6,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "representations/ParticleFilterType.hpp"
+
 namespace rfs {
 
 enum class SensorType { Radar, Lidar, Camera };
@@ -50,12 +52,15 @@ public:
   std::vector<TargetDescriptor> targets;
   FilterFamily filterFamily = FilterFamily::PHD;
   RepresentationType representation = RepresentationType::GaussianMixture;
+  ParticleFilterType coreParticleType = ParticleFilterType::SIR;
   bool loggerVerbose = true;
+  double truthMatchThreshold = 80.0;
 
 private:
   static SensorType sensorTypeFromString(const std::string &value);
   static FilterFamily filterFamilyFromString(const std::string &value);
   static RepresentationType representationFromString(const std::string &value);
+  static ParticleFilterType particleFilterTypeFromString(const std::string &value);
   static bool parseSensor(const nlohmann::json &entry, SensorConfig &out);
   static bool parseTarget(const nlohmann::json &entry, TargetDescriptor &out);
 };

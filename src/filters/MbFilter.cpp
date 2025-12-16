@@ -112,7 +112,7 @@ const std::vector<MbFilter::BernoulliHypothesis> &MbFilter::hypotheses() const {
 }
 
 std::unique_ptr<IRepresentation> MbFilter::createEmptyRepresentation() const {
-  return createRepresentation(representationType_);
+  return createRepresentation(representationType_, config_);
 }
 
 void MbFilter::pruneHypotheses() {

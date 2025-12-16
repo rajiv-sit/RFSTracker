@@ -58,6 +58,26 @@ TEST(TrackerConfigTest, LoadFromJson) {
   std::remove(path.c_str());
 }
 
+TEST(TrackerConfigTest, LoadsCoreParticleType) {
+  const auto tmpPath =
+      std::filesystem::temp_directory_path() / "tmp_particle_type.json";
+  const std::string path = tmpPath.string();
+  std::ofstream out(path);
+  out << R"(
+  {
+    "representation": "Particles",
+    "core_particle_type": "APF"
+  }
+)";
+  out.close();
+
+  auto config = TrackerConfig::defaultConfig();
+  EXPECT_TRUE(config.loadFromJson(path));
+  EXPECT_EQ(config.representation, RepresentationType::Particle);
+  EXPECT_EQ(config.coreParticleType, ParticleFilterType::APF);
+  std::remove(path.c_str());
+}
+
 TEST(NumericsTest, LogSumExpAndNormalize) {
   std::vector<double> values = {0.0, 1.0, 2.0};
   const double le = NumericsUtils::logSumExp(values);

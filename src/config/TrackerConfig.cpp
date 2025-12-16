@@ -19,7 +19,9 @@ TrackerConfig TrackerConfig::defaultConfig() {
   config.enableVisualization = true;
   config.filterFamily = FilterFamily::PHD;
   config.representation = RepresentationType::GaussianMixture;
+  config.coreParticleType = ParticleFilterType::SIR;
   config.loggerVerbose = true;
+  config.truthMatchThreshold = 80.0;
 
   config.sensors = {{
       SensorType::Radar,
@@ -89,6 +91,9 @@ bool TrackerConfig::loadFromJson(const std::string &path) {
   if (document.contains("enableVisualization")) {
     enableVisualization = document["enableVisualization"].get<bool>();
   }
+  if (document.contains("truthMatchThreshold")) {
+    truthMatchThreshold = document["truthMatchThreshold"].get<double>();
+  }
   if (document.contains("logger_verbose")) {
     loggerVerbose = document["logger_verbose"].get<bool>();
   }
@@ -127,6 +132,14 @@ bool TrackerConfig::loadFromJson(const std::string &path) {
     representation =
         representationFromString(document["representation"].get<std::string>());
   }
+  if (document.contains("core_particle_type")) {
+    coreParticleType =
+        particleFilterTypeFromString(document["core_particle_type"].get<std::string>());
+  }
+  if (document.contains("coreParticleType")) {
+    coreParticleType =
+        particleFilterTypeFromString(document["coreParticleType"].get<std::string>());
+  }
 
   if (targets.empty()) {
     targets = defaultConfig().targets;
@@ -143,6 +156,9 @@ bool TrackerConfig::validate() const {
     return false;
   }
   if (sensors.empty()) {
+    return false;
+  }
+  if (truthMatchThreshold <= 0.0) {
     return false;
   }
   return true;
@@ -196,6 +212,22 @@ RepresentationType TrackerConfig::representationFromString(const std::string &va
     return RepresentationType::Spline;
   }
   return RepresentationType::GaussianMixture;
+}
+
+ParticleFilterType TrackerConfig::particleFilterTypeFromString(const std::string &value) {
+  if (value == "SIS") {
+    return ParticleFilterType::SIS;
+  }
+  if (value == "SIR") {
+    return ParticleFilterType::SIR;
+  }
+  if (value == "APF") {
+    return ParticleFilterType::APF;
+  }
+  if (value == "RPF") {
+    return ParticleFilterType::RPF;
+  }
+  return ParticleFilterType::SIR;
 }
 
 bool TrackerConfig::parseTarget(const Json &entry, TargetDescriptor &out) {
