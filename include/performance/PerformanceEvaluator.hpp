@@ -1,15 +1,18 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <optional>
 #include <vector>
 
 namespace rfs {
 
 struct TrackEstimate_t {
   Eigen::Vector4d state = Eigen::Vector4d::Zero();
+  std::optional<int> truthId;
 };
 
 struct TruthTarget_t {
+  int id = -1;
   Eigen::Vector4d state = Eigen::Vector4d::Zero();
 };
 

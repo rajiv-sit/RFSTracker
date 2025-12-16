@@ -182,7 +182,9 @@ std::vector<TrackEstimate_t> TrackingPipeline::buildEstimates() const {
 
   for (const auto &track : confirmedTracks) {
     TrackEstimate_t estimate;
-    estimate.state << track.position.x(), track.position.y(), 0.0, 0.0;
+    estimate.state << track.position.x(), track.position.y(), track.velocity.x(),
+        track.velocity.y();
+    estimate.truthId = track.truthId;
     result.push_back(estimate);
   }
 
@@ -195,6 +197,7 @@ std::vector<TruthTarget_t> TrackingPipeline::buildTruth() const {
 
   for (const auto &target : simulation_.truthStates()) {
     TruthTarget_t truth;
+    truth.id = target.id;
     truth.state = target.state;
     result.push_back(truth);
   }
