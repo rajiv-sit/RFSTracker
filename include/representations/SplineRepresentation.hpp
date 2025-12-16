@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <optional>
 
 namespace SPLINTER {
 class BSpline;
@@ -25,10 +26,13 @@ public:
 private:
   std::unique_ptr<SPLINTER::BSpline> buildSpline(const SPLINTER::DataTable &table) const;
 
-  std::unique_ptr<SPLINTER::BSpline> bsplineX_;
-  std::unique_ptr<SPLINTER::BSpline> bsplineY_;
-  std::vector<double> evaluationTimes_;
-  std::map<double, Eigen::Vector2d> measurementHistory_;
+  struct TrackHistory {
+    std::map<double, Eigen::Vector2d> samples;
+    double latestTime = 0.0;
+    std::unique_ptr<SPLINTER::BSpline> bsplineX;
+    std::unique_ptr<SPLINTER::BSpline> bsplineY;
+  };
+  std::map<std::optional<int>, TrackHistory> trackHistories_;
   static constexpr size_t numBasisFunctions_ = 12;
   static constexpr size_t minSplineSamples_ = 5;
   static constexpr size_t maxHistorySamples_ = 128;

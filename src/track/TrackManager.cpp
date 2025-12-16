@@ -215,10 +215,7 @@ void TrackManager::pruneDeadTracks() {
 void TrackManager::refreshConfirmedTracks() {
   confirmedTracks_.clear();
   std::copy_if(tracks_.begin(), tracks_.end(), std::back_inserter(confirmedTracks_),
-               [](const TrackState &track) {
-                 return track.status == TrackStatus::Confirmed &&
-                        track.velocity.norm() > kConfirmedVelocityThreshold;
-               });
+               [](const TrackState &track) { return track.status == TrackStatus::Confirmed; });
 }
 
 } // namespace rfs

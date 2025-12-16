@@ -12,7 +12,7 @@ struct GaussianComponent_t {
   Eigen::Vector4d mean = Eigen::Vector4d::Zero();
   Eigen::Matrix4d covariance = Eigen::Matrix4d::Identity();
   double weight = 1.0;
-  int hits = 0;
+  int hits = 1;
 };
 
 /** @brief Gaussian mixture helper utilities. */

@@ -17,6 +17,7 @@
 #include <unordered_set>
 #include <deque>
 #include <vector>
+#include <algorithm>
 #include <Eigen/Dense>
 
 #ifndef RFSTRACKER_SHADER_DIR
@@ -296,7 +297,7 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
   std::vector<const TrackState *> confirmedTrackPtrs;
   if (options_.showTracks) {
     for (const auto &track : tracks) {
-      if (track.status == TrackStatus::Confirmed) {
+      if (track.status == TrackStatus::Confirmed && isNonStationaryTrack(track)) {
         confirmedTrackPoints.push_back(track.position);
         confirmedTrackPtrs.push_back(&track);
       }
@@ -365,7 +366,13 @@ void ImGuiVisualizer::showControlPanels(const MeasurementSet_t &measurements,
   ImGui::Separator();
   ImGui::Text("Truth targets: %zu", truth.size());
   ImGui::Text("Measurements: %zu", measurements.measurements.size());
-  ImGui::Text("Tracks alive: %zu", tracks.size());
+  size_t nonStationaryConfirmed = 0;
+  for (const auto &track : tracks) {
+    if (track.status == TrackStatus::Confirmed && isNonStationaryTrack(track)) {
+      ++nonStationaryConfirmed;
+    }
+  }
+  ImGui::Text("Non-stationary confirmed tracks: %zu", nonStationaryConfirmed);
   ImGui::Text("Filter family: %s", filterFamilyLabel(config_->filterFamily));
   ImGui::Text("Representation: %s", representationLabel(config_->representation));
   if (config_->representation == RepresentationType::Particle) {
@@ -425,6 +432,9 @@ void ImGuiVisualizer::showMetricsWindow(const MeasurementSet_t &measurements,
     ImGui::Separator();
 
     for (const auto &track : tracks) {
+      if (track.status != TrackStatus::Confirmed || !isNonStationaryTrack(track)) {
+        continue;
+      }
       ImGui::Text("%d", track.id);
       ImGui::NextColumn();
       const char *statusLabel = track.status == TrackStatus::Confirmed
@@ -523,6 +533,9 @@ void ImGuiVisualizer::showTrackTruthComparison(const std::vector<TrackState> &tr
   }
 
   for (const auto &track : tracks) {
+    if (track.status != TrackStatus::Confirmed || !isNonStationaryTrack(track)) {
+      continue;
+    }
     const bool hasTruth = track.truthId && truthById.contains(*track.truthId);
     Eigen::Vector2d truthPos = Eigen::Vector2d::Zero();
     Eigen::Vector2d truthVel = Eigen::Vector2d::Zero();
@@ -648,6 +661,10 @@ Eigen::Vector3d ImGuiVisualizer::colorVectorForStatus(TrackStatus status) const 
   }
 }
 
+bool ImGuiVisualizer::isNonStationaryTrack(const TrackState &track) const {
+  return track.velocity.norm() > kStationaryVelocityThreshold;
+}
+
 ImU32 ImGuiVisualizer::colorForStatus(TrackStatus status) const {
   const auto color = colorVectorForStatus(status);
   return IM_COL32(static_cast<int>(color.x() * 255.0f),
@@ -718,7 +735,7 @@ void ImGuiVisualizer::updateTrails(const std::vector<TrackState> &tracks,
                                    const std::vector<TargetState_t> &truth) {
   std::unordered_set<int> activeTrackIds;
   for (const auto &track : tracks) {
-    if (track.status != TrackStatus::Confirmed) {
+    if (track.status != TrackStatus::Confirmed || !isNonStationaryTrack(track)) {
       continue;
     }
     auto &trail = trackTrails_[track.id];

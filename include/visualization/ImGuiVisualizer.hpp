@@ -94,8 +94,11 @@ private:
   std::filesystem::path shaderDirectory_;
 
   static constexpr size_t kTrailLength = 512;
+  static constexpr double kStationaryVelocityThreshold = 0.15;
   std::unordered_map<int, std::deque<Eigen::Vector2d>> trackTrails_;
   std::unordered_map<int, std::deque<Eigen::Vector2d>> truthTrails_;
+
+  bool isNonStationaryTrack(const TrackState &track) const;
 };
 
 } // namespace rfs
