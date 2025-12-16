@@ -10,7 +10,7 @@
   "logger_verbose": true,
   "filterFamily": "PHD",
   "representation": "Particles",
-  "core_particle_type": "SIR",
+  "core_particle_type": "RPF",
   "sensors": [
     {
       "type": "Radar",

@@ -51,6 +51,10 @@ RFSTracker is a Windows-based multi-target tracking prototype that simulates a 5
   * set `filterFamily` to `PHD`, `CPHD`, `MB`, or `GLMB` and `representation` to `GaussianMixture`, `Particles`, or `Spline`
     * when `representation` is `Particles`, add `core_particle_type` (`SIS`, `SIR`, `APF`, `RPF`) to pick the underlying particle filter strategy; omitting it defaults to `SIR`
     * optional `truthMatchThreshold` (meters) caps how far an estimate may drift from a truth state before the pipeline stops pairing them for logging/metrics; defaults to `80.0`
+  * The project exposes the full set of configurable options:
+    * **Filter families:** `PHD`, `CPHD`, `MB`, `GLMB`
+    * **Representations:** `GaussianMixture`, `Particles`, `Spline`
+    * **Particle strategies (when `representation` is `Particles`):** `SIS`, `SIR`, `APF`, `RPF`
 
 - Run `rfs_app.exe custom_config.json` from `build_debug\Debug` / `build_release\Release` to override the default file.
 
