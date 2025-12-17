@@ -8,7 +8,7 @@
   "snrDb": 0.0,
   "enableVisualization": true,
   "logger_verbose": true,
-  "filterFamily": "MB",
+  "filterFamily": "CPHD",
   "representation": "GaussianMixture",
   "sensors": [
     {

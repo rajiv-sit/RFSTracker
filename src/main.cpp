@@ -1,6 +1,7 @@
 #include "config/TrackerConfig.hpp"
 #include "logging/LoggerControl.hpp"
 #include "pipeline/TrackingPipeline.hpp"
+#include "visualization/HeadlessVisualizer.hpp"
 #include "visualization/ImGuiVisualizer.hpp"
 
 #include <filesystem>
@@ -50,11 +51,17 @@ int main(int argc, char **argv) {
 
   rfs::setLoggerVerbose(config->loggerVerbose);
 
-  auto visualizer = std::make_unique<rfs::ImGuiVisualizer>(config);
-  if (!visualizer->initialize()) {
-    std::cerr << "ERROR: Visualizer initialization failed.\n";
-    logMessage("main: visualizer init failed");
-    return 1;
+  std::unique_ptr<rfs::Visualizer> visualizer;
+  if (config->enableVisualization) {
+    visualizer = std::make_unique<rfs::ImGuiVisualizer>(config);
+    if (!visualizer->initialize()) {
+      std::cerr << "ERROR: Visualizer initialization failed.\n";
+      logMessage("main: visualizer init failed");
+      return 1;
+    }
+  } else {
+    visualizer = std::make_unique<rfs::HeadlessVisualizer>(config);
+    visualizer->initialize();
   }
 
   logMessage("main: visualizer initialized");
