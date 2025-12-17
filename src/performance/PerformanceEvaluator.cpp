@@ -3,16 +3,14 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
+#include <utility>
 
 namespace rfs {
 
-double PerformanceEvaluator::computeNEES(
-    const std::vector<TrackEstimate_t> &estimates,
-    const std::vector<TruthTarget_t> &truth) const {
-  if (estimates.empty() || truth.empty()) {
-    return 0.0;
-  }
-
+namespace {
+std::vector<std::pair<Eigen::Vector4d, Eigen::Vector4d>>
+matchEstimatesToTruth(const std::vector<TrackEstimate_t> &estimates,
+                      const std::vector<TruthTarget_t> &truth) {
   std::unordered_map<int, const TruthTarget_t *> truthById;
   truthById.reserve(truth.size());
   for (const auto &entry : truth) {
@@ -21,8 +19,7 @@ double PerformanceEvaluator::computeNEES(
     }
   }
 
-  double total = 0.0;
-  size_t matched = 0;
+  std::vector<std::pair<Eigen::Vector4d, Eigen::Vector4d>> pairs;
   for (const auto &estimate : estimates) {
     if (!estimate.truthId) {
       continue;
@@ -31,51 +28,49 @@ double PerformanceEvaluator::computeNEES(
     if (found == truthById.end()) {
       continue;
     }
-    const Eigen::Vector4d error = estimate.state - found->second->state;
-    total += error.squaredNorm();
-    ++matched;
+    pairs.emplace_back(estimate.state, found->second->state);
   }
 
-  if (matched == 0) {
+  if (pairs.empty() && !estimates.empty() && !truth.empty()) {
+    const size_t count = std::min(estimates.size(), truth.size());
+    for (size_t i = 0; i < count; ++i) {
+      pairs.emplace_back(estimates[i].state, truth[i].state);
+    }
+  }
+  return pairs;
+}
+} // namespace
+
+double PerformanceEvaluator::computeNEES(
+    const std::vector<TrackEstimate_t> &estimates,
+    const std::vector<TruthTarget_t> &truth) const {
+  const auto pairs = matchEstimatesToTruth(estimates, truth);
+  if (pairs.empty()) {
     return 0.0;
   }
-  return total / static_cast<double>(matched * 4);
+
+  double total = 0.0;
+  for (const auto &pair : pairs) {
+    const Eigen::Vector4d error = pair.first - pair.second;
+    total += error.squaredNorm();
+  }
+  return total / static_cast<double>(pairs.size() * 4);
 }
 
 double PerformanceEvaluator::computeRMSE(
     const std::vector<TrackEstimate_t> &estimates,
     const std::vector<TruthTarget_t> &truth) const {
-  if (estimates.empty() || truth.empty()) {
+  const auto pairs = matchEstimatesToTruth(estimates, truth);
+  if (pairs.empty()) {
     return 0.0;
-  }
-
-  std::unordered_map<int, const TruthTarget_t *> truthById;
-  truthById.reserve(truth.size());
-  for (const auto &entry : truth) {
-    if (entry.id >= 0) {
-      truthById[entry.id] = &entry;
-    }
   }
 
   double total = 0.0;
-  size_t matched = 0;
-  for (const auto &estimate : estimates) {
-    if (!estimate.truthId) {
-      continue;
-    }
-    const auto found = truthById.find(*estimate.truthId);
-    if (found == truthById.end()) {
-      continue;
-    }
-    const Eigen::Vector4d error = estimate.state - found->second->state;
+  for (const auto &pair : pairs) {
+    const Eigen::Vector4d error = pair.first - pair.second;
     total += error.head<2>().squaredNorm();
-    ++matched;
   }
-
-  if (matched == 0) {
-    return 0.0;
-  }
-  return std::sqrt(total / static_cast<double>(matched));
+  return std::sqrt(total / static_cast<double>(pairs.size()));
 }
 
 double PerformanceEvaluator::computeOSPA(
@@ -85,28 +80,12 @@ double PerformanceEvaluator::computeOSPA(
     return 0.0;
   }
 
-  std::unordered_map<int, const TruthTarget_t *> truthById;
-  truthById.reserve(truth.size());
-  for (const auto &entry : truth) {
-    if (entry.id >= 0) {
-      truthById[entry.id] = &entry;
-    }
-  }
-
+  const auto pairs = matchEstimatesToTruth(estimates, truth);
   double constLevel = 50.0;
   double sum = 0.0;
-  size_t matched = 0;
-  for (const auto &estimate : estimates) {
-    if (!estimate.truthId) {
-      continue;
-    }
-    const auto found = truthById.find(*estimate.truthId);
-    if (found == truthById.end()) {
-      continue;
-    }
-    const double distance = (estimate.state - found->second->state).head<2>().norm();
+  for (const auto &pair : pairs) {
+    const double distance = (pair.first - pair.second).head<2>().norm();
     sum += std::min(constLevel, distance);
-    ++matched;
   }
 
   const size_t totalEstimates = estimates.size();
@@ -115,7 +94,7 @@ double PerformanceEvaluator::computeOSPA(
   if (n == 0) {
     return 0.0;
   }
-
+  const size_t matched = pairs.size();
   const size_t unmatched = (n > matched) ? (n - matched) : 0;
   const double ospa = (sum + constLevel * static_cast<double>(unmatched)) /
                       static_cast<double>(n);

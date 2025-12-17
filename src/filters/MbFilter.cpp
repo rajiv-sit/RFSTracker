@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
 #include <limits>
 #include <sstream>
 #include <vector>
@@ -14,6 +15,18 @@ namespace {
 constexpr double kGatingThreshold = 30.0;
 constexpr double kExistenceDecay = 0.03;
 constexpr double kExistenceBoost = 0.18;
+std::string formatMeasurementDetail(const Measurement_t &measurement) {
+  std::ostringstream oss;
+  oss << "t=" << measurement.time << " pos=(" << measurement.value.x() << "," << measurement.value.y()
+      << ")";
+  oss << " truth=";
+  if (measurement.truthId) {
+    oss << *measurement.truthId;
+  } else {
+    oss << "unknown";
+  }
+  return oss.str();
+}
 }
 
 MbFilter::MbFilter(RepresentationType representationType, const TrackerConfig *config)
@@ -44,6 +57,10 @@ void MbFilter::update(const MeasurementSet_t &measurements) {
   const size_t hypCount = hypotheses_.size();
   const size_t measurementCount = measurements.measurements.size();
   std::vector<std::vector<double>> costMatrix(hypCount, std::vector<double>(measurementCount));
+  std::vector<std::string> measurementLabels(measurementCount);
+  for (size_t j = 0; j < measurementCount; ++j) {
+    measurementLabels[j] = formatMeasurementDetail(measurements.measurements[j]);
+  }
   for (size_t i = 0; i < hypCount; ++i) {
     const auto states = hypotheses_[i].representation->estimate();
     Eigen::Vector2d statePos = Eigen::Vector2d::Zero();
@@ -57,6 +74,7 @@ void MbFilter::update(const MeasurementSet_t &measurements) {
 
   AssociationResult_t assignment = solver_.solve(costMatrix);
   std::vector<bool> measurementAssigned(measurementCount, false);
+  std::vector<int> assignedMeasurementIndices(hypCount, -1);
 
   for (size_t i = 0; i < hypCount; ++i) {
     auto &hypothesis = hypotheses_[i];
@@ -65,12 +83,19 @@ void MbFilter::update(const MeasurementSet_t &measurements) {
       measurementIdx = assignment.assignment[i];
     }
     if (measurementIdx >= 0 && static_cast<size_t>(measurementIdx) < measurementCount) {
+      const double distance = costMatrix[i][measurementIdx];
+      if (distance > kGatingThreshold) {
+        measurementIdx = -1;
+      }
+    }
+    if (measurementIdx >= 0 && static_cast<size_t>(measurementIdx) < measurementCount) {
       MeasurementSet_t localMeasurements;
       localMeasurements.measurements.push_back(measurements.measurements[measurementIdx]);
       hypothesis.representation->update(localMeasurements);
       hypothesis.existence =
           std::min(1.0, hypothesis.existence + kExistenceBoost * detectionProbability());
       measurementAssigned[measurementIdx] = true;
+      assignedMeasurementIndices[i] = measurementIdx;
     } else {
       hypothesis.existence = std::max(0.0, hypothesis.existence - kExistenceDecay);
     }
@@ -88,9 +113,29 @@ void MbFilter::update(const MeasurementSet_t &measurements) {
     born.existence = 0.5;
     born.id = nextHypothesisId_++;
     hypotheses_.push_back(std::move(born));
+    assignedMeasurementIndices.push_back(static_cast<int>(idx));
   }
 
+  std::ostringstream updateDetail;
+  updateDetail << "postUpdate hypCount=" << hypotheses_.size();
+  for (size_t i = 0; i < hypotheses_.size(); ++i) {
+    const auto &hypothesis = hypotheses_[i];
+    updateDetail << " [hyp" << hypothesis.id << " exist=" << std::fixed << std::setprecision(2)
+                 << hypothesis.existence;
+    int assignedIdx = (i < assignedMeasurementIndices.size()) ? assignedMeasurementIndices[i] : -1;
+    if (assignedIdx >= 0) {
+      updateDetail << " assigned=" << measurementLabels[assignedIdx];
+    } else {
+      updateDetail << " assigned=none";
+    }
+    updateDetail << "]";
+  }
+  logFilterAction("MbFilter", "updateDetail", updateDetail.str());
+
   pruneHypotheses();
+  std::ostringstream pruneDetail;
+  pruneDetail << "postPrune hypCount=" << hypotheses_.size();
+  logFilterAction("MbFilter", "prune", pruneDetail.str());
 }
 
 EstimatorOutput_t MbFilter::estimate() const {

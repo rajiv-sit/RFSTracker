@@ -5,6 +5,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+if (MSVC)
+    add_compile_options(/FS)
+endif()
+
 include(${CMAKE_BINARY_DIR}/conan_toolchain.cmake)
 
 find_package(Eigen3 CONFIG REQUIRED)
@@ -39,9 +43,6 @@ target_link_libraries(rfs_core PUBLIC
     glad::glad
 )
 target_compile_definitions(rfs_core PRIVATE RFSTRACKER_SHADER_DIR="${CMAKE_SOURCE_DIR}/shaders")
-if (MSVC)
-    target_compile_options(rfs_core PRIVATE /FS)
-endif()
 
 add_executable(rfs_app src/main.cpp)
 target_link_libraries(rfs_app PRIVATE rfs_core

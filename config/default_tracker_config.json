@@ -8,8 +8,8 @@
   "snrDb": 0.0,
   "enableVisualization": true,
   "logger_verbose": true,
-  "filterFamily": "CPHD",
-  "representation": "Spline",
+  "filterFamily": "MB",
+  "representation": "GaussianMixture",
   "sensors": [
     {
       "type": "Radar",
