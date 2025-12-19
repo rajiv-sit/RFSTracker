@@ -176,15 +176,12 @@ bool ImGuiVisualizer::initialize() {
   ImGui::CreateContext();
   ImGuiIO &io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  io.IniFilename = "imgui.ini";
 
   ImGui::StyleColorsDark();
   ImGui_ImplGlfw_InitForOpenGL(window_, true);
   ImGui_ImplOpenGL3_Init("#version 330 core");
 
-  if (!createShaderProgram()) {
-    return false;
-  }
-  setupGridGeometry();
   return true;
 }
 
@@ -294,70 +291,139 @@ void ImGuiVisualizer::renderFrame(const MeasurementSet_t &measurements,
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
 
+  // Fullscreen dockspace so all panels can be docked/undocked and layout persists in imgui.ini.
+  if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_DockingEnable) {
+    ImGuiViewport *viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->WorkPos);
+    ImGui::SetNextWindowSize(viewport->WorkSize);
+    ImGui::SetNextWindowViewport(viewport->ID);
+
+    ImGuiWindowFlags dockspaceFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
+                                      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+                                      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
+                                      ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::Begin("DockSpaceHost", nullptr, dockspaceFlags);
+    ImGuiID dockspaceId = ImGui::GetID("RfsDockSpace");
+    ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+    ImGui::End();
+    ImGui::PopStyleVar(2);
+  }
+
   showControlPanels(measurements, tracks, truth, scanId, timeElapsed);
   showMetricsWindow(measurements, tracks, truth, metrics);
   showTruthPanel(truth);
   showTrackTruthComparison(tracks, truth);
 
-  int displayW, displayH;
-  std::vector<Eigen::Vector2d> confirmedTrackPoints;
-  std::vector<const TrackState *> confirmedTrackPtrs;
+  updateTrails(tracks, truth);
+
+  ImGui::SetNextWindowSize(ImVec2(600, 500), ImGuiCond_FirstUseEver);
+  ImGui::Begin("World View", nullptr,
+               ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+  ImVec2 canvasPos = ImGui::GetCursorScreenPos();
+  ImVec2 canvasSize = ImGui::GetContentRegionAvail();
+  if (canvasSize.x < 50.0f) {
+    canvasSize.x = 50.0f;
+  }
+  if (canvasSize.y < 50.0f) {
+    canvasSize.y = 50.0f;
+  }
+  const ImVec2 canvasEnd(canvasPos.x + canvasSize.x, canvasPos.y + canvasSize.y);
+  ImDrawList *drawList = ImGui::GetWindowDrawList();
+  drawList->AddRectFilled(canvasPos, canvasEnd, IM_COL32(15, 15, 18, 255));
+  drawList->AddRect(canvasPos, canvasEnd, IM_COL32(60, 60, 70, 255));
+
+  const auto toCanvas = [&](const Eigen::Vector2d &point) {
+    const float nx =
+        static_cast<float>((point.x() + areaHalfWidth_) / (2.0f * areaHalfWidth_));
+    const float ny =
+        static_cast<float>((point.y() + areaHalfHeight_) / (2.0f * areaHalfHeight_));
+    return ImVec2(canvasPos.x + nx * canvasSize.x,
+                  canvasPos.y + (1.0f - ny) * canvasSize.y);
+  };
+  const auto toColor = [](const Eigen::Vector3d &color) {
+    return IM_COL32(static_cast<int>(color.x() * 255.0f),
+                    static_cast<int>(color.y() * 255.0f),
+                    static_cast<int>(color.z() * 255.0f), 255);
+  };
+
+  const int gridLines = 10;
+  for (int i = 0; i <= gridLines; ++i) {
+    const float t = static_cast<float>(i) / static_cast<float>(gridLines);
+    const float x = canvasPos.x + t * canvasSize.x;
+    const float y = canvasPos.y + t * canvasSize.y;
+    drawList->AddLine(ImVec2(x, canvasPos.y), ImVec2(x, canvasEnd.y),
+                      IM_COL32(40, 40, 50, 255));
+    drawList->AddLine(ImVec2(canvasPos.x, y), ImVec2(canvasEnd.x, y),
+                      IM_COL32(40, 40, 50, 255));
+  }
+
+  if (options_.showTruth) {
+    for (const auto &entry : truthTrails_) {
+      if (entry.second.size() < 2) {
+        continue;
+      }
+      std::vector<ImVec2> points;
+      points.reserve(entry.second.size());
+      for (const auto &p : entry.second) {
+        points.push_back(toCanvas(p));
+      }
+      drawList->AddPolyline(points.data(), static_cast<int>(points.size()),
+                            IM_COL32(46, 217, 84, 255), ImDrawFlags_None, 2.2f);
+    }
+  }
+
+  for (const auto &entry : trackTrails_) {
+    if (entry.second.size() < 2) {
+      continue;
+    }
+    std::vector<ImVec2> points;
+    points.reserve(entry.second.size());
+    for (const auto &p : entry.second) {
+      points.push_back(toCanvas(p));
+    }
+    const ImU32 color = toColor(colorVectorForStatus(TrackStatus::Confirmed));
+    drawList->AddPolyline(points.data(), static_cast<int>(points.size()), color,
+                          ImDrawFlags_None, 2.4f);
+  }
+
+  if (options_.showMeasurements) {
+    for (const auto &measurement : measurements.measurements) {
+      const ImVec2 pos = toCanvas(measurement.value);
+      drawList->AddCircleFilled(pos, 4.5f, IM_COL32(255, 90, 90, 255));
+    }
+  }
+
+  if (options_.showTruth) {
+    for (const auto &truthTarget : truth) {
+      const ImVec2 pos = toCanvas(truthTarget.state.head<2>());
+      drawList->AddCircleFilled(pos, 6.0f, IM_COL32(46, 217, 84, 255));
+    }
+  }
+
   if (options_.showTracks) {
     for (const auto &track : tracks) {
-      if (track.status == TrackStatus::Confirmed && isNonStationaryTrack(track)) {
-        confirmedTrackPoints.push_back(track.position);
-        confirmedTrackPtrs.push_back(&track);
+      if (track.status != TrackStatus::Confirmed || !isNonStationaryTrack(track)) {
+        continue;
       }
+      const ImVec2 pos = toCanvas(track.position);
+      const ImU32 color = toColor(colorVectorForStatus(track.status));
+      drawList->AddCircleFilled(pos, 7.0f, color);
+      const std::string label = std::to_string(track.id);
+      drawList->AddText(ImVec2(pos.x + 6.0f, pos.y - 8.0f), color, label.c_str());
     }
   }
 
-  glfwGetFramebufferSize(window_, &displayW, &displayH);
-  renderAxisLabels(displayW, displayH);
-  if (options_.showTracks && !confirmedTrackPtrs.empty()) {
-    auto *drawList = ImGui::GetForegroundDrawList();
-    const ImU32 idColor = colorForStatus(TrackStatus::Confirmed);
-    constexpr float labelOffset = 8.0f;
-    for (const auto *track : confirmedTrackPtrs) {
-      const ImVec2 screenPos = worldToScreen(track->position, displayW, displayH);
-      const ImVec2 labelPos(screenPos.x + labelOffset, screenPos.y - labelOffset);
-      const std::string label = std::to_string(track->id);
-      drawList->AddText(labelPos, idColor, label.c_str());
-    }
-  }
+  ImGui::Dummy(canvasSize);
+  ImGui::End();
 
   ImGui::Render();
+  int displayW, displayH;
+  glfwGetFramebufferSize(window_, &displayW, &displayH);
   glViewport(0, 0, displayW, displayH);
   glClearColor(0.06f, 0.06f, 0.07f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT);
-  renderGrid();
-
-  if (options_.showMeasurements) {
-    std::vector<Eigen::Vector2d> measurementPoints;
-    measurementPoints.reserve(measurements.measurements.size());
-    for (const auto &measurement : measurements.measurements) {
-      measurementPoints.push_back(measurement.value);
-    }
-    renderPoints(measurementPoints, {1.0, 0.35, 0.35}, 6.0f);
-  }
-
-  if (options_.showTruth) {
-    std::vector<Eigen::Vector2d> truthPoints;
-    truthPoints.reserve(truth.size());
-    for (const auto &truthTarget : truth) {
-      truthPoints.emplace_back(truthTarget.state.head<2>());
-    }
-    renderPoints(truthPoints, {0.18, 0.85, 0.33}, 7.0f);
-  }
-
-  if (options_.showTracks) {
-    renderPoints(confirmedTrackPoints, {0.18, 0.60, 1.0}, 8.0f);
-  }
-
-  updateTrails(tracks, truth);
-  // renderTrackTrails();  // temporarily disabled while ID labels are active
-  if (options_.showTruth) {
-    renderTrajectories(truthTrails_, {0.18, 0.85, 0.33}, 2.2f);
-  }
 
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
   glfwSwapBuffers(window_);
@@ -831,6 +897,13 @@ void ImGuiVisualizer::shutdown() {
   if (pointVAO_) {
     glDeleteVertexArrays(1, &pointVAO_);
     pointVAO_ = 0;
+  }
+
+  if (ImGui::GetCurrentContext()) {
+    const ImGuiIO &io = ImGui::GetIO();
+    if (io.IniFilename && io.IniFilename[0] != '\0') {
+      ImGui::SaveIniSettingsToDisk(io.IniFilename);
+    }
   }
 
   ImGui_ImplOpenGL3_Shutdown();
